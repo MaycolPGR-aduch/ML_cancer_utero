@@ -1,13 +1,57 @@
-// Prototipo IA-Tamizaje Cervical v0.1 (TRL 3) - Cliente Web
+// Prototipo IA-Tamizaje Cervical v0.1 (TRL 3) - Cliente Web Moderno y Responsive
 
 const $ = (id) => document.getElementById(id);
+const isMobileViewport = () => window.innerWidth <= 980;
+
+// --- Lightbox Modal ---
+function openLightbox(src, title) {
+  if (!src) return;
+  $("lightboxImg").src = src;
+  $("lightboxTitle").textContent = title || "Vista ampliada";
+  $("lightboxModal").classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+}
+
+function closeLightbox() {
+  $("lightboxModal").classList.add("hidden");
+  document.body.style.overflow = "";
+}
+
+$("lightboxClose").addEventListener("click", closeLightbox);
+$("lightboxBackdrop").addEventListener("click", closeLightbox);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeLightbox();
+});
+
+// --- Copy JSON helper ---
+function setupCopyButton(btnId, preId) {
+  const btn = $(btnId);
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    const txt = $(preId).textContent;
+    try {
+      await navigator.clipboard.writeText(txt);
+      const prev = btn.textContent;
+      btn.textContent = "Copiado";
+      setTimeout(() => (btn.textContent = prev), 1400);
+    } catch {
+      btn.textContent = "No disponible";
+    }
+  });
+}
+setupCopyButton("btnCopyCnnJson", "cnnRawJson");
+setupCopyButton("btnCopyTabJson", "tabRawJson");
 
 // --- Tabs ---
 document.querySelectorAll(".tab").forEach((btn) => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".tab").forEach((b) => {
+      b.classList.remove("active");
+      b.setAttribute("aria-selected", "false");
+    });
     document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
     btn.classList.add("active");
+    btn.setAttribute("aria-selected", "true");
     $("tab-" + btn.dataset.tab).classList.add("active");
   });
 });
@@ -17,25 +61,20 @@ async function checkHealth() {
   try {
     const res = await fetch("/api/health");
     const data = await res.json();
-    const pills = [];
-    pills.push(
+    const pills = [
       data.cnn_ready
-        ? `<span class="pill pill-ok">CNN MobileNetV2: Listo</span>`
-        : `<span class="pill pill-warn">CNN: Entrenando / No cargado</span>`
-    );
-    pills.push(
+        ? `<span class="pill pill-ok"><span class="dot"></span>CNN MobileNetV2</span>`
+        : `<span class="pill pill-warn"><span class="dot"></span>CNN pendiente</span>`,
       data.ood_ready
-        ? `<span class="pill pill-ok">Filtro OOD: Activo</span>`
-        : `<span class="pill pill-warn">Filtro OOD: Inactivo</span>`
-    );
-    pills.push(
+        ? `<span class="pill pill-ok"><span class="dot"></span>Filtro OOD</span>`
+        : `<span class="pill pill-warn"><span class="dot"></span>OOD inactivo</span>`,
       data.tabular_ready
-        ? `<span class="pill pill-ok">Módulo Tabular: Listo</span>`
-        : `<span class="pill pill-warn">Tabular: No cargado</span>`
-    );
+        ? `<span class="pill pill-ok"><span class="dot"></span>Tabular RF</span>`
+        : `<span class="pill pill-warn"><span class="dot"></span>Tabular pendiente</span>`,
+    ];
     $("statusPills").innerHTML = pills.join("");
-  } catch (err) {
-    $("statusPills").innerHTML = `<span class="pill pill-warn">API desconectada</span>`;
+  } catch {
+    $("statusPills").innerHTML = `<span class="pill pill-warn"><span class="dot"></span>API desconectada</span>`;
   }
 }
 
@@ -44,6 +83,12 @@ const dropzone = $("dropzone");
 const imageInput = $("imageInput");
 
 dropzone.addEventListener("click", () => imageInput.click());
+dropzone.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    imageInput.click();
+  }
+});
 dropzone.addEventListener("dragover", (e) => {
   e.preventDefault();
   dropzone.classList.add("dragover");
@@ -53,41 +98,59 @@ dropzone.addEventListener("drop", (e) => {
   e.preventDefault();
   dropzone.classList.remove("dragover");
   if (e.dataTransfer.files.length > 0) {
+    clearActiveSampleButtons();
     sendImageFile(e.dataTransfer.files[0]);
   }
 });
 imageInput.addEventListener("change", () => {
   if (imageInput.files.length > 0) {
+    clearActiveSampleButtons();
     sendImageFile(imageInput.files[0]);
   }
 });
 
-async function sendImageFile(file) {
-  $("cnnError").classList.add("hidden");
-  $("cnnPlaceholder").textContent = "Analizando imagen citológica y generando mapa Grad-CAM...";
-  $("cnnPlaceholder").classList.remove("hidden");
-  $("cnnResults").classList.add("hidden");
+function clearActiveSampleButtons() {
+  document.querySelectorAll(".sample-btn, .sample-btn-ood").forEach((b) => b.classList.remove("is-active"));
+}
 
+function setCnnLoading(loading, msg = "Procesando imagen, validando dominio OOD y generando Grad-CAM...") {
+  $("cnnError").classList.add("hidden");
+  if (loading) {
+    $("cnnPlaceholder").classList.add("hidden");
+    $("cnnResults").classList.add("hidden");
+    $("cnnLoadingText").textContent = msg;
+    $("cnnLoading").classList.remove("hidden");
+    if (isMobileViewport()) {
+      $("cnnResultCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  } else {
+    $("cnnLoading").classList.add("hidden");
+  }
+}
+
+async function sendImageFile(file) {
+  setCnnLoading(true, `Analizando "${file.name}"...`);
   const formData = new FormData();
   formData.append("file", file);
   try {
     const res = await fetch("/api/predict/image", { method: "POST", body: formData });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Error en la predicción");
+    setCnnLoading(false);
     renderCnnResult(data);
   } catch (err) {
+    setCnnLoading(false);
+    $("cnnPlaceholder").classList.remove("hidden");
     $("cnnError").textContent = err.message;
     $("cnnError").classList.remove("hidden");
-    $("cnnPlaceholder").textContent = "Ocurrió un error al procesar la imagen.";
   }
 }
 
-async function runSampleImage(filename, isOod = false) {
-  $("cnnError").classList.add("hidden");
-  $("cnnPlaceholder").textContent = `Evaluando muestra ${filename}...`;
-  $("cnnPlaceholder").classList.remove("hidden");
-  $("cnnResults").classList.add("hidden");
+async function runSampleImage(filename, isOod = false, btnEl = null) {
+  clearActiveSampleButtons();
+  if (btnEl) btnEl.classList.add("is-active");
 
+  setCnnLoading(true, isOod ? `Probando rechazo OOD sobre ${filename}...` : `Analizando muestra ${filename}...`);
   const endpoint = isOod
     ? `/api/predict/ood-sample/${encodeURIComponent(filename)}`
     : `/api/predict/sample/${encodeURIComponent(filename)}`;
@@ -96,8 +159,11 @@ async function runSampleImage(filename, isOod = false) {
     const res = await fetch(endpoint, { method: "POST" });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Error al evaluar muestra");
+    setCnnLoading(false);
     renderCnnResult(data);
   } catch (err) {
+    setCnnLoading(false);
+    $("cnnPlaceholder").classList.remove("hidden");
     $("cnnError").textContent = err.message;
     $("cnnError").classList.remove("hidden");
   }
@@ -109,41 +175,53 @@ function renderCnnResult(data) {
 
   const p = data.prediccion;
   const ood = data.validacion_dominio_ood || {};
+  const isValidDomain = data.dominio_valido !== false;
+
   const banner = $("cnnTriageBanner");
   banner.className = `triage-banner level-${p.nivel_tamizaje}`;
 
-  const isValidDomain = data.dominio_valido !== false;
   if (!isValidDomain) {
+    $("cnnTriageLabel").textContent = "FILTRO DE SEGURIDAD OOD";
     $("cnnPredTitle").textContent = "IMAGEN FUERA DE DOMINIO (RECHAZADA)";
     $("cnnPredDesc").textContent = p.recomendacion_apoyo;
-    $("cnnAbnormalProb").textContent = ood.probabilidad_dominio_cervical !== undefined
-      ? `${(ood.probabilidad_dominio_cervical * 100).toFixed(1)}%`
-      : "OOD";
-    document.querySelector("#cnnTriageBanner .score-caption").textContent = "Prob. Cervical";
+    $("cnnAbnormalProb").textContent =
+      ood.probabilidad_dominio_cervical !== undefined
+        ? `${(ood.probabilidad_dominio_cervical * 100).toFixed(1)}%`
+        : "OOD";
+    $("cnnScoreCaption").textContent = "Prob. Cervical";
   } else {
+    $("cnnTriageLabel").textContent = `PRIORIDAD DE TAMIZAJE: ${p.nivel_tamizaje}`;
     $("cnnPredTitle").textContent = `${p.nombre_clinico} (${(p.confianza * 100).toFixed(1)}%)`;
     $("cnnPredDesc").textContent = p.recomendacion_apoyo;
     $("cnnAbnormalProb").textContent = `${(p.probabilidad_anormal_agregada * 100).toFixed(1)}%`;
-    document.querySelector("#cnnTriageBanner .score-caption").textContent = "Prob. Anormal";
+    $("cnnScoreCaption").textContent = "Prob. Anormal";
   }
 
   const oodChip = ood.habilitado
-    ? `<span class="meta-chip">Filtro OOD: ${isValidDomain ? "Válida" : "Rechazada"} (p=${ood.probabilidad_dominio_cervical}, cos=${ood.similitud_coseno_centroides}, ${ood.latencia_ood_ms} ms)</span>`
+    ? `<span class="meta-chip ${isValidDomain ? "meta-chip-ok" : "meta-chip-ood"}">OOD: ${
+        isValidDomain ? "Citología Válida" : "Rechazada"
+      } (p=${ood.probabilidad_dominio_cervical}, cos=${ood.similitud_coseno_centroides}, ${ood.latencia_ood_ms} ms)</span>`
     : "";
 
   $("cnnMetaRow").innerHTML = `
     <span class="meta-chip">Archivo: ${data.entrada.archivo}</span>
-    <span class="meta-chip">Original: ${data.entrada.tamano_original[0]}×${data.entrada.tamano_original[1]} → 224×224</span>
-    <span class="meta-chip">Inferencia CNN: ${data.tiempos_ms.inferencia_cnn} ms</span>
+    <span class="meta-chip">${data.entrada.tamano_original[0]}×${data.entrada.tamano_original[1]} → 224×224</span>
+    <span class="meta-chip">CNN: ${data.tiempos_ms.inferencia_cnn} ms</span>
     ${isValidDomain ? `<span class="meta-chip">Grad-CAM: ${data.tiempos_ms.gradcam_xai} ms</span>` : ""}
     ${oodChip}
-    <span class="meta-chip">Versión: ${data.version}</span>
   `;
 
   $("cnnPreviewImg").src = data.imagenes.entrada_224;
+  $("cnnPreviewZoom").onclick = () => openLightbox(data.imagenes.entrada_224, `Entrada Preprocesada (224×224) — ${data.entrada.archivo}`);
+
+  const visualCompare = $("cnnVisualCompare");
   if (isValidDomain && data.imagenes.gradcam_overlay) {
+    visualCompare.classList.remove("single-col");
     $("cnnGradcamBox").classList.remove("hidden");
     $("cnnGradcamImg").src = data.imagenes.gradcam_overlay;
+    $("cnnGradcamZoom").onclick = () =>
+      openLightbox(data.imagenes.gradcam_overlay, `Mapa Explicable Grad-CAM — ${p.nombre_clinico}`);
+
     $("cnnProbSection").classList.remove("hidden");
     $("cnnProbBars").innerHTML = p.probabilidades
       .map((item) => {
@@ -157,8 +235,8 @@ function renderCnnResult(data) {
         return `
           <div class="prob-item">
             <div class="prob-header">
-              <span><strong>${item.nombre_es}</strong> <span class="muted">(${item.clase})</span></span>
-              <strong>${pct}%</strong>
+              <span class="prob-name"><strong>${item.nombre_es}</strong> <span class="muted">(${item.clase})</span></span>
+              <strong class="prob-pct">${pct}%</strong>
             </div>
             <div class="prob-track">
               <div class="prob-fill ${clsType}" style="width: ${pct}%"></div>
@@ -168,11 +246,18 @@ function renderCnnResult(data) {
       })
       .join("");
   } else {
+    visualCompare.classList.add("single-col");
     $("cnnGradcamBox").classList.add("hidden");
     $("cnnProbSection").classList.add("hidden");
   }
 
-  const cleanJson = { ...data, imagenes: { entrada_224: "[base64 PNG omitido]", gradcam_overlay: isValidDomain ? "[base64 PNG omitido]" : null } };
+  const cleanJson = {
+    ...data,
+    imagenes: {
+      entrada_224: "[base64 PNG omitido]",
+      gradcam_overlay: isValidDomain ? "[base64 PNG omitido]" : null,
+    },
+  };
   $("cnnRawJson").textContent = JSON.stringify(cleanJson, null, 2);
 }
 
@@ -180,70 +265,104 @@ async function loadSamples() {
   try {
     const res = await fetch("/api/samples");
     const data = await res.json();
+
     if (!data.samples || data.samples.length === 0) {
-      $("sampleButtons").innerHTML = `<span class="muted">Aún no hay muestras exportadas (ejecuta train_eval_cnn.py).</span>`;
+      $("sampleButtons").innerHTML = `<span class="muted">Sin muestras exportadas.</span>`;
     } else {
       $("sampleButtons").innerHTML = data.samples
         .map(
           (s) =>
-            `<button type="button" class="sample-btn" data-file="${s.filename}">${s.expected_class.replace("im_", "")}</button>`
+            `<button type="button" class="sample-btn" data-file="${s.filename}">${s.expected_class
+              .replace("im_", "")
+              .replace("Superficial-Intermediate", "Superficial-Interm.")}</button>`
         )
         .join("");
       document.querySelectorAll(".sample-btn").forEach((btn) => {
-        btn.addEventListener("click", () => runSampleImage(btn.dataset.file, false));
+        btn.addEventListener("click", () => runSampleImage(btn.dataset.file, false, btn));
       });
     }
 
     if (!data.ood_samples || data.ood_samples.length === 0) {
-      $("oodSampleButtons").innerHTML = `<span class="muted">Filtro OOD sin muestras exportadas aún.</span>`;
+      $("oodSampleButtons").innerHTML = `<span class="muted">Sin muestras OOD disponibles.</span>`;
     } else {
       $("oodSampleButtons").innerHTML = data.ood_samples
         .map(
           (s) =>
-            `<button type="button" class="sample-btn-ood" data-ood-file="${s.filename}">Probar OOD: ${s.label}</button>`
+            `<button type="button" class="sample-btn-ood" data-ood-file="${s.filename}">OOD: ${s.label}</button>`
         )
         .join("");
       document.querySelectorAll(".sample-btn-ood").forEach((btn) => {
-        btn.addEventListener("click", () => runSampleImage(btn.dataset.oodFile, true));
+        btn.addEventListener("click", () => runSampleImage(btn.dataset.oodFile, true, btn));
       });
     }
-  } catch (err) {
-    $("sampleButtons").innerHTML = `<span class="muted">No se pudieron cargar muestras.</span>`;
+  } catch {
+    $("sampleButtons").innerHTML = `<span class="muted">No se pudieron cargar las muestras.</span>`;
   }
 }
 
-// --- Tabular Form ---
+// --- Tabular Form (Organized in Clean Collapsible Clinical Groups) ---
 let tabularSchemaCache = null;
+
+function renderFieldHtml(f) {
+  if (f.type === "binary") {
+    return `
+      <div class="field-group">
+        <label for="f_${f.name}">${f.label}</label>
+        <select id="f_${f.name}" data-feature="${f.name}">
+          <option value="">(Desconocido / Imputar)</option>
+          <option value="0" ${f.default === 0 ? "selected" : ""}>No (0)</option>
+          <option value="1" ${f.default === 1 ? "selected" : ""}>Sí (1)</option>
+        </select>
+      </div>
+    `;
+  }
+  return `
+    <div class="field-group">
+      <label for="f_${f.name}">${f.label}</label>
+      <input type="number" inputmode="decimal" id="f_${f.name}" data-feature="${f.name}"
+        min="${f.min ?? 0}" max="${f.max ?? 100}" step="${f.step ?? 1}"
+        value="${f.default ?? f.median ?? 0}" placeholder="Mediana: ${f.median}" />
+    </div>
+  `;
+}
 
 async function loadTabularSchema() {
   try {
     const res = await fetch("/api/tabular/schema");
     if (!res.ok) return;
     tabularSchemaCache = await res.json();
-    const container = $("tabularFields");
-    container.innerHTML = tabularSchemaCache.features
-      .map((f) => {
-        if (f.type === "binary") {
-          return `
-            <div class="field-group">
-              <label for="f_${f.name}">${f.label}</label>
-              <select id="f_${f.name}" data-feature="${f.name}">
-                <option value="">(Desconocido / Imputar)</option>
-                <option value="0" ${f.default === 0 ? "selected" : ""}>No (0)</option>
-                <option value="1" ${f.default === 1 ? "selected" : ""}>Sí (1)</option>
-              </select>
-            </div>
-          `;
-        }
-        return `
-          <div class="field-group">
-            <label for="f_${f.name}">${f.label}</label>
-            <input type="number" id="f_${f.name}" data-feature="${f.name}"
-              min="${f.min ?? 0}" max="${f.max ?? 100}" step="${f.step ?? 1}"
-              value="${f.default ?? f.median ?? 0}" placeholder="Mediana: ${f.median}" />
+
+    const groupDemo = [];
+    const groupHabits = [];
+    const groupStds = [];
+
+    tabularSchemaCache.features.forEach((f) => {
+      if (f.name.startsWith("STDs")) {
+        groupStds.push(f);
+      } else if (["Age", "Number of sexual partners", "First sexual intercourse", "Num of pregnancies"].includes(f.name)) {
+        groupDemo.push(f);
+      } else {
+        groupHabits.push(f);
+      }
+    });
+
+    const groups = [
+      { title: "1. Demografía e Historia Reproductiva", items: groupDemo, open: true },
+      { title: "2. Tabaquismo y Anticoncepción", items: groupHabits, open: true },
+      { title: `3. Antecedentes de ETS (${groupStds.length} variables opcionales)`, items: groupStds, open: false },
+    ];
+
+    $("tabularSections").innerHTML = groups
+      .map(
+        (g) => `
+        <details class="form-group-card" ${g.open ? "open" : ""}>
+          <summary>${g.title}</summary>
+          <div class="fields-grid">
+            ${g.items.map(renderFieldHtml).join("")}
           </div>
-        `;
-      })
+        </details>
+      `
+      )
       .join("");
   } catch (err) {
     console.error(err);
@@ -287,21 +406,34 @@ $("btnPresetEmpty").addEventListener("click", () => applyTabularPreset("empty"))
 
 $("tabularForm").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const btn = $("btnSubmitTabular");
+  const prevTxt = btn.textContent;
+  btn.textContent = "Calculando...";
+  btn.disabled = true;
+
   const values = {};
   document.querySelectorAll("[data-feature]").forEach((el) => {
     values[el.dataset.feature] = el.value === "" ? null : Number(el.value);
   });
-  const res = await fetch("/api/predict/tabular", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ values }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    alert(data.detail || "Error en inferencia tabular");
-    return;
+
+  try {
+    const res = await fetch("/api/predict/tabular", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ values }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Error en inferencia tabular");
+    renderTabularResult(data);
+    if (isMobileViewport()) {
+      $("tabResultCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    btn.textContent = prevTxt;
+    btn.disabled = false;
   }
-  renderTabularResult(data);
 });
 
 function renderTabularResult(data) {
@@ -318,8 +450,7 @@ function renderTabularResult(data) {
   $("tabMetaRow").innerHTML = `
     <span class="meta-chip">Modelo: ${data.modelo}</span>
     <span class="meta-chip">Latencia: ${data.latencia_inferencia_ms} ms</span>
-    <span class="meta-chip">Variables imputadas: ${data.variables_imputadas}</span>
-    <span class="meta-chip">Versión: ${data.version}</span>
+    <span class="meta-chip">Imputadas: ${data.variables_imputadas}</span>
   `;
 
   const probPct = Math.min(100, Math.max(0, p.probabilidad_riesgo_biopsia * 100));
@@ -334,11 +465,11 @@ function renderTabularResult(data) {
       return `
         <div class="prob-item">
           <div class="prob-header">
-            <span>${f.variable}</span>
-            <strong>${pct}%</strong>
+            <span class="prob-name">${f.variable}</span>
+            <strong class="prob-pct">${pct}%</strong>
           </div>
           <div class="prob-track">
-            <div class="prob-fill" style="width: ${Math.min(100, pct * 3)}%"></div>
+            <div class="prob-fill" style="width: ${Math.min(100, pct * 3.2)}%"></div>
           </div>
         </div>
       `;
@@ -363,53 +494,51 @@ async function loadEvidence() {
       const m = cnn.metricas_test;
       const bin = m.tamizaje_clinico_binario;
       kpis.push(
-        kpiCard("CNN Macro-F1 (Test)", (m.macro_f1 * 100).toFixed(2) + "%", `Accuracy: ${(m.accuracy * 100).toFixed(2)}%`),
-        kpiCard("CNN Macro ROC-AUC", m.macro_roc_auc_ovr.toFixed(4), `PR-AUC: ${m.macro_pr_auc_ovr.toFixed(4)}`),
-        kpiCard("Sensibilidad Anormal", (bin.sensibilidad_recall * 100).toFixed(2) + "%", `Especificidad: ${(bin.especificidad * 100).toFixed(2)}%`),
-        kpiCard("Latencia CNN (CPU)", cnn.prueba_inferencia.latencia_promedio_ms_30_runs + " ms", "0 láminas compartidas (no leakage)")
+        kpiCard("CNN Macro-F1", (m.macro_f1 * 100).toFixed(2) + "%", `Accuracy: ${(m.accuracy * 100).toFixed(2)}%`),
+        kpiCard("CNN ROC-AUC", m.macro_roc_auc_ovr.toFixed(4), `PR-AUC: ${m.macro_pr_auc_ovr.toFixed(4)}`),
+        kpiCard("Sensibilidad", (bin.sensibilidad_recall * 100).toFixed(2) + "%", `Especificidad: ${(bin.especificidad * 100).toFixed(2)}%`),
+        kpiCard("Latencia CNN", cnn.prueba_inferencia.latencia_promedio_ms_30_runs + " ms", "0 láminas compartidas")
       );
 
       $("cnnEvidenceSummary").innerHTML = [
-        evRow("Versión / Arquitectura", `${cnn.identificacion.version} — ${cnn.entrenamiento.arquitectura}`),
-        evRow("Dataset", `SIPaKMeD (${cnn.datos.total_imagenes} imágenes en 5 clases)`),
-        evRow("Split sin fuga (láminas)", `Train ${cnn.datos.particion_sin_fuga.train.imagenes} | Val ${cnn.datos.particion_sin_fuga.val.imagenes} | Test ${cnn.datos.particion_sin_fuga.test.imagenes}`),
+        evRow("Arquitectura", "MobileNetV2 (Transfer Learning)"),
+        evRow("Dataset", `SIPaKMeD (${cnn.datos.total_imagenes} imágenes)`),
+        evRow("Split sin fuga", `${cnn.datos.particion_sin_fuga.train.imagenes} / ${cnn.datos.particion_sin_fuga.val.imagenes} / ${cnn.datos.particion_sin_fuga.test.imagenes}`),
         evRow("Láminas compartidas", `${cnn.datos.particion_sin_fuga.laminas_compartidas_entre_splits} (verificado)`),
-        evRow("Macro Recall / Precision", `${cnn.metricas_test.macro_recall} / ${cnn.metricas_test.macro_precision}`),
-        evRow("Tiempo entrenamiento", `${cnn.entrenamiento.tiempo_entrenamiento_segundos} s (${cnn.entrenamiento.epocas_totales} épocas)`),
+        evRow("Recall / Precision", `${cnn.metricas_test.macro_recall} / ${cnn.metricas_test.macro_precision}`),
       ].join("");
-    } else {
-      $("cnnEvidenceSummary").innerHTML = `<p class="muted">Pendiente de completar entrenamiento CNN...</p>`;
     }
 
     if (tab) {
       const tm = tab.metricas_modelo_seleccionado.cv_5fold;
       const toof = tab.metricas_modelo_seleccionado.oof_con_umbral_tamizaje;
       kpis.push(
-        kpiCard("Tabular ROC-AUC (5-Fold)", tm.roc_auc.toFixed(4), `PR-AUC: ${tm.pr_auc.toFixed(4)} (base 0.064)`),
-        kpiCard("Tabular Sensibilidad OOF", (toof.recall_sensibilidad * 100).toFixed(1) + "%", `Umbral: ${toof.umbral} | Latencia: ${tab.prueba_inferencia.latencia_promedio_ms_50_runs} ms`)
+        kpiCard("Tabular ROC-AUC", tm.roc_auc.toFixed(4), `PR-AUC: ${tm.pr_auc.toFixed(4)} (2.6× base)`),
+        kpiCard("Tabular Esp.", (toof.especificidad * 100).toFixed(1) + "%", `Sensib.: ${(toof.recall_sensibilidad * 100).toFixed(1)}% | thr ${toof.umbral}`)
       );
 
       $("tabEvidenceSummary").innerHTML = [
-        evRow("Versión / Modelo", `${tab.identificacion.version} — ${tab.metodologia.modelo_seleccionado}`),
-        evRow("Dimensiones", `${tab.datos.dimensiones_iniciales.filas}×${tab.datos.dimensiones_iniciales.columnas} → ${tab.datos.dimensiones_entrada_modelo.variables_entrada} variables sin fuga`),
-        evRow("Desenlace Biopsy", `${tab.datos.desenlaces_registrados.Biopsy.positivos}/${tab.datos.dimensiones_iniciales.filas} (${tab.datos.desenlaces_registrados.Biopsy.prevalencia_pct}%)`),
-        evRow("Validación", "StratifiedKFold (k=5, random_state=42)"),
-        evRow("ROC-AUC / PR-AUC (CV)", `${tm.roc_auc} / ${tm.pr_auc}`),
-        evRow("Recall / F1 (OOF thr*)", `${toof.recall_sensibilidad} / ${toof.f1_score}`),
+        evRow("Modelo", tab.metodologia.modelo_seleccionado),
+        evRow("Variables", `858×36 → ${tab.datos.dimensiones_entrada_modelo.variables_entrada} sin leakage`),
+        evRow("Biopsy positivos", `${tab.datos.desenlaces_registrados.Biopsy.positivos}/858 (${tab.datos.desenlaces_registrados.Biopsy.prevalencia_pct}%)`),
+        evRow("Validación", "StratifiedKFold (k=5)"),
+        evRow("Latencia CPU", `${tab.prueba_inferencia.latencia_promedio_ms_50_runs} ms`),
       ].join("");
     }
 
     if (ood) {
       const om = ood.metricas_test;
       kpis.push(
-        kpiCard("Filtro OOD Rechazo", (om.rechazo_no_cervical_especificidad * 100).toFixed(2) + "%", `Acepta citología: ${(om.aceptacion_citologia_valida_recall * 100).toFixed(2)}% | +${om.sobrecosto_latencia_ms} ms`)
+        kpiCard("Rechazo OOD", (om.rechazo_no_cervical_especificidad * 100).toFixed(1) + "%", `Acepta citología: ${(om.aceptacion_citologia_valida_recall * 100).toFixed(1)}%`),
+        kpiCard("Overhead OOD", `+${om.sobrecosto_latencia_ms} ms`, "Embeddings 1,280 dim")
       );
+
       $("oodEvidenceSummary").innerHTML = [
-        evRow("Versión / Extractor", `${ood.identificacion.version} — Embeddings compartidos MobileNetV2 (1,280 dim)`),
-        evRow("Negativos OOD", "archivebase2 (7 órganos NO cervicales, 21 subclases; Cervical excluido sin leakage)"),
-        evRow("Aceptación citología / Rechazo OOD", `${(om.aceptacion_citologia_valida_recall * 100).toFixed(2)}% / ${(om.rechazo_no_cervical_especificidad * 100).toFixed(2)}% (ROC-AUC: ${om.roc_auc})`),
-        evRow("Stress-test sintéticas no médicas", om.stress_test_sinteticas_rechazo),
-        evRow("Sobrecosto de latencia CPU", `+${om.sobrecosto_latencia_ms} ms por imagen`),
+        evRow("Extractor", "MobileNetV2 compartido (1,280 dim)"),
+        evRow("Negativos OOD", "archivebase2 (7 órganos, 21 subclases)"),
+        evRow("Recall / Especif.", `${(om.aceptacion_citologia_valida_recall * 100).toFixed(1)}% / ${(om.rechazo_no_cervical_especificidad * 100).toFixed(1)}%`),
+        evRow("Órganos no vistos", "96.4% – 100% (LOOO)"),
+        evRow("Sintéticas no méd.", om.stress_test_sinteticas_rechazo),
       ].join("");
     }
 
@@ -421,8 +550,8 @@ async function loadEvidence() {
       { title: "CNN — Historial de Entrenamiento", src: "/outputs/cnn_training_history.png" },
       { title: "CNN — Escalado de Anotaciones .dat a 224×224", src: "/outputs/cnn_sample_annotations_224.png" },
       { title: "CNN — Explicabilidad Grad-CAM (Muestras Test)", src: "/outputs/cnn_sample_gradcam.png" },
-      { title: "Filtro OOD — Matriz de Confusión y Generalización Leave-One-Organ-Out", src: "/outputs/ood_confusion_matrix.png" },
-      { title: "Filtro OOD — Separación de Scores y Similitud Coseno", src: "/outputs/ood_score_distribution.png" },
+      { title: "Filtro OOD — Confusión y Leave-One-Organ-Out", src: "/outputs/ood_confusion_matrix.png" },
+      { title: "Filtro OOD — Separación Scores y Coseno", src: "/outputs/ood_score_distribution.png" },
       { title: "Tabular — Matriz de Confusión OOF (5-Fold)", src: "/outputs/tabular_confusion_matrix.png" },
       { title: "Tabular — Curvas ROC y Precision-Recall (5-Fold)", src: "/outputs/tabular_roc_pr_curves.png" },
     ];
@@ -430,13 +559,24 @@ async function loadEvidence() {
     $("figuresGrid").innerHTML = figs
       .map(
         (f) => `
-        <div class="figure-card">
+        <article class="figure-card" data-zoom-src="${f.src}" data-zoom-title="${f.title}" tabindex="0" role="button">
           <div class="figure-card-title">${f.title}</div>
-          <img src="${f.src}" alt="${f.title}" onerror="this.closest('.figure-card').style.display='none'" />
-        </div>
+          <img src="${f.src}" alt="${f.title}" loading="lazy" onerror="this.closest('.figure-card').style.display='none'" />
+        </article>
       `
       )
       .join("");
+
+    document.querySelectorAll(".figure-card").forEach((card) => {
+      const open = () => openLightbox(card.dataset.zoomSrc, card.dataset.zoomTitle);
+      card.addEventListener("click", open);
+      card.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          open();
+        }
+      });
+    });
   } catch (err) {
     console.error(err);
   }

@@ -2,88 +2,184 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1628" />
   <title>IA-Tamizaje Cervical v0.1 | Prototipo TRL 3</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
+  <!-- TOPBAR -->
   <header class="topbar">
     <div class="container topbar-inner">
       <div class="brand">
-        <div class="brand-badge">TRL 3</div>
-        <div>
-          <h1>IA-Tamizaje Cervical <span class="version-tag">v0.1</span></h1>
-          <p class="subtitle">Prototipo experimental multimodal: Citología CNN (SIPaKMeD) + Factores de Riesgo Tabular</p>
+        <div class="brand-icon" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 18h8"/>
+            <path d="M3 22h18"/>
+            <path d="M14 22a7 7 0 1 0 0-14h-1"/>
+            <path d="M9 14h2"/>
+            <path d="M9 12a2 2 0 0 1-2-2V6h6v4a2 2 0 0 1-2 2Z"/>
+            <path d="M12 6V3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-title-row">
+            <h1>IA-Tamizaje Cervical</h1>
+            <span class="badge-trl">TRL 3</span>
+            <span class="badge-ver">v0.1</span>
+          </div>
+          <p class="subtitle">Apoyo multimodal al tamizaje temprano: CNN MobileNetV2 + Grad-CAM + Filtro OOD + Riesgo Tabular</p>
         </div>
       </div>
-      <div class="status-pills" id="statusPills">
-        <span class="pill pill-loading">Conectando API...</span>
+
+      <div class="topbar-right">
+        <div class="status-pills" id="statusPills" aria-live="polite">
+          <span class="pill pill-loading"><span class="dot"></span>Conectando API...</span>
+        </div>
+        <a href="/docs" target="_blank" rel="noopener" class="api-link" title="Documentación interactiva Swagger OpenAPI">
+          <span>API Docs</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+        </a>
       </div>
     </div>
   </header>
 
-  <div class="disclaimer-bar">
-    <div class="container">
-      <strong>Aviso Clínico y Regulatorio (TRL 3):</strong>
-      Este software es una prueba de concepto analítica y experimental en entorno controlado para apoyo temprano al tamizaje.
-      <strong>No sustituye la evaluación citopatológica ni constituye un diagnóstico médico definitivo.</strong>
+  <!-- CLINICAL DISCLAIMER -->
+  <div class="disclaimer-bar" role="note">
+    <div class="container disclaimer-inner">
+      <svg class="disclaimer-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <p>
+        <strong>Aviso Clínico y Regulatorio (TRL 3):</strong>
+        Prototipo experimental de apoyo al tamizaje en entorno controlado.
+        <strong>No sustituye la evaluación citopatológica ni constituye un diagnóstico médico definitivo.</strong>
+      </p>
     </div>
   </div>
 
-  <main class="container">
-    <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="cnn" role="tab">1. Citología Cervical (CNN + Grad-CAM)</button>
-      <button class="tab" data-tab="tabular" role="tab">2. Factores de Riesgo (Tabular)</button>
-      <button class="tab" data-tab="evidence" role="tab">3. Evidencia Experimental TRL 3</button>
-    </nav>
+  <!-- STICKY NAVIGATION TABS -->
+  <div class="nav-shell">
+    <div class="container">
+      <nav class="tabs" role="tablist" aria-label="Módulos del prototipo">
+        <button class="tab active" data-tab="cnn" role="tab" aria-selected="true" aria-controls="tab-cnn">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="9"/>
+            <circle cx="12" cy="12" r="3"/>
+            <line x1="12" y1="3" x2="12" y2="5"/>
+            <line x1="12" y1="19" x2="12" y2="21"/>
+          </svg>
+          <span class="tab-label-full">Citología (CNN + Grad-CAM)</span>
+          <span class="tab-label-short">Citología CNN</span>
+        </button>
+        <button class="tab" data-tab="tabular" role="tab" aria-selected="false" aria-controls="tab-tabular">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+            <rect x="8" y="2" width="8" height="4" rx="1"/>
+            <path d="M9 14l2 2 4-4"/>
+          </svg>
+          <span class="tab-label-full">Factores de Riesgo (Tabular)</span>
+          <span class="tab-label-short">Riesgo Tabular</span>
+        </button>
+        <button class="tab" data-tab="evidence" role="tab" aria-selected="false" aria-controls="tab-evidence">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+          <span class="tab-label-full">Evidencia Experimental TRL 3</span>
+          <span class="tab-label-short">Evidencia TRL 3</span>
+        </button>
+      </nav>
+    </div>
+  </div>
 
-    <!-- TAB 1: CNN -->
-    <section id="tab-cnn" class="tab-panel active">
-      <div class="grid-2">
+  <main class="container main-content">
+    <!-- ==================== TAB 1: CNN ==================== -->
+    <section id="tab-cnn" class="tab-panel active" role="tabpanel">
+      <div class="grid-cnn">
+        <!-- Input Column -->
         <div class="card">
-          <h2>Subir Imagen Citológica</h2>
-          <p class="muted">Formatos soportados: <code>.bmp</code>, <code>.png</code>, <code>.jpg</code>. La imagen se redimensiona a <code>224×224</code> y se normaliza automáticamente antes de pasar por MobileNetV2.</p>
-
-          <div id="dropzone" class="dropzone">
-            <input type="file" id="imageInput" accept="image/*,.bmp" hidden />
-            <div class="dropzone-icon">🔬</div>
-            <p class="dropzone-title">Arrastra una imagen aquí o haz clic para seleccionar</p>
-            <p class="dropzone-hint">Células individuales recortadas (SIPaKMeD u otras citologías)</p>
+          <div class="card-head">
+            <div>
+              <h2>Análisis de Imagen Citológica</h2>
+              <p class="muted">Microfotografías celulares de Papanicolaou (<code>.bmp</code>, <code>.png</code>, <code>.jpg</code>, máx. 10 MB). Incluye verificación automática de dominio (OOD) antes de clasificar.</p>
+            </div>
           </div>
 
-          <div class="samples-box">
-            <h3>O prueba con muestras reales del conjunto de prueba (Test):</h3>
+          <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Subir imagen citológica">
+            <input type="file" id="imageInput" accept="image/*,.bmp" hidden />
+            <div class="dropzone-icon-wrap" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </div>
+            <p class="dropzone-title">Sube una imagen celular</p>
+            <p class="dropzone-hint">Arrastra aquí o pulsa el botón para seleccionar desde tu equipo o galería</p>
+            <span class="btn btn-primary btn-sm dropzone-cta">Seleccionar Imagen</span>
+          </div>
+
+          <div class="samples-section">
+            <div class="samples-head">
+              <span class="section-eyebrow eyebrow-valid">Muestras reales de prueba (Test SIPaKMeD)</span>
+            </div>
             <div id="sampleButtons" class="sample-buttons">
               <span class="muted">Cargando muestras...</span>
             </div>
           </div>
 
-          <div class="samples-box">
-            <h3>Probar Filtro de Seguridad OOD (imágenes NO cervicales):</h3>
+          <div class="samples-section samples-ood-box">
+            <div class="samples-head">
+              <span class="section-eyebrow eyebrow-ood">Probar Filtro de Seguridad OOD (Imágenes NO cervicales)</span>
+            </div>
+            <p class="tiny-muted">Verifica cómo el sistema detecta y rechaza imágenes ajenas a citología cervical sin emitir clasificaciones falsas.</p>
             <div id="oodSampleButtons" class="sample-buttons">
               <span class="muted">Cargando muestras OOD...</span>
             </div>
           </div>
 
-          <div id="cnnError" class="alert alert-error hidden"></div>
+          <div id="cnnError" class="alert alert-error hidden" role="alert"></div>
         </div>
 
-        <div class="card" id="cnnResultCard">
-          <h2>Resultado de Inferencia CNN</h2>
-          <div id="cnnPlaceholder" class="placeholder">
-            Sube una imagen o selecciona una muestra de prueba para ejecutar la clasificación y generar el mapa de calor Grad-CAM.
+        <!-- Result Column -->
+        <div class="card result-card" id="cnnResultCard">
+          <div class="card-head">
+            <h2>Resultado de Inferencia y Explicabilidad</h2>
           </div>
 
-          <div id="cnnResults" class="hidden">
+          <div id="cnnPlaceholder" class="placeholder">
+            <div class="placeholder-icon" aria-hidden="true">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </div>
+            <p>Sube una imagen citológica o elige una muestra de prueba para ejecutar el filtro OOD, la clasificación en 5 clases y el mapa de calor Grad-CAM.</p>
+          </div>
+
+          <div id="cnnLoading" class="loading-box hidden" aria-live="polite">
+            <div class="spinner"></div>
+            <p id="cnnLoadingText">Procesando imagen, validando dominio OOD y generando Grad-CAM...</p>
+          </div>
+
+          <div id="cnnResults" class="hidden fade-in">
             <div class="triage-banner" id="cnnTriageBanner">
-              <div>
-                <div class="triage-label">NIVEL DE PRIORIDAD DE TAMIZAJE</div>
+              <div class="triage-main">
+                <div class="triage-label" id="cnnTriageLabel">PRIORIDAD DE TAMIZAJE</div>
                 <div class="triage-title" id="cnnPredTitle">—</div>
                 <div class="triage-sub" id="cnnPredDesc">—</div>
               </div>
               <div class="triage-score">
                 <div class="score-value" id="cnnAbnormalProb">—</div>
-                <div class="score-caption">Prob. Anormal</div>
+                <div class="score-caption" id="cnnScoreCaption">Prob. Anormal</div>
               </div>
             </div>
 
@@ -92,11 +188,15 @@
             <div class="visual-compare" id="cnnVisualCompare">
               <div class="img-box">
                 <div class="img-caption">Entrada Preprocesada (224×224)</div>
-                <img id="cnnPreviewImg" alt="Entrada 224x224" />
+                <button type="button" class="img-zoom-btn" id="cnnPreviewZoom" aria-label="Ampliar imagen original">
+                  <img id="cnnPreviewImg" alt="Imagen celular preprocesada 224x224" />
+                </button>
               </div>
               <div class="img-box" id="cnnGradcamBox">
-                <div class="img-caption">Explicabilidad Grad-CAM (Zonas de Atención)</div>
-                <img id="cnnGradcamImg" alt="Grad-CAM Overlay" />
+                <div class="img-caption">Grad-CAM (Atención del Modelo)</div>
+                <button type="button" class="img-zoom-btn" id="cnnGradcamZoom" aria-label="Ampliar mapa Grad-CAM">
+                  <img id="cnnGradcamImg" alt="Mapa de calor explicable Grad-CAM" />
+                </button>
               </div>
             </div>
 
@@ -106,7 +206,12 @@
             </div>
 
             <details class="json-details">
-              <summary>Ver salida JSON estructurada (Evidencia de inferencia TRL 3)</summary>
+              <summary>
+                <span>Ver salida JSON estructurada (Evidencia TRL 3)</span>
+              </summary>
+              <div class="json-toolbar">
+                <button type="button" class="btn btn-ghost btn-xs" id="btnCopyCnnJson">Copiar JSON</button>
+              </div>
               <pre id="cnnRawJson"></pre>
             </details>
           </div>
@@ -114,41 +219,56 @@
       </div>
     </section>
 
-    <!-- TAB 2: TABULAR -->
-    <section id="tab-tabular" class="tab-panel">
-      <div class="grid-2 tabular-layout">
+    <!-- ==================== TAB 2: TABULAR ==================== -->
+    <section id="tab-tabular" class="tab-panel" role="tabpanel">
+      <div class="grid-tabular">
+        <!-- Form Column -->
         <div class="card">
-          <div class="card-header-row">
+          <div class="card-head">
             <div>
               <h2>Perfil Clínico de Factores de Riesgo</h2>
-              <p class="muted">Variables clínicas sin fuga de información (excluye desenlaces post-prueba y columnas con &gt;50% ausentes). Los campos vacíos se imputan automáticamente por mediana en el pipeline.</p>
+              <p class="muted">26 variables clínicas sin fuga de información (excluye desenlaces post-prueba). Cualquier campo vacío se imputa automáticamente por mediana dentro del pipeline.</p>
             </div>
           </div>
 
           <div class="preset-bar">
-            <button type="button" class="btn btn-secondary" id="btnPresetLow">Cargar Perfil Bajo</button>
-            <button type="button" class="btn btn-secondary" id="btnPresetHigh">Cargar Perfil Alto</button>
-            <button type="button" class="btn btn-ghost" id="btnPresetEmpty">Vaciar (Probar Imputación)</button>
+            <button type="button" class="btn btn-soft-green btn-sm" id="btnPresetLow">Perfil Riesgo Bajo</button>
+            <button type="button" class="btn btn-soft-red btn-sm" id="btnPresetHigh">Perfil Riesgo Alto (Biopsy=1)</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btnPresetEmpty">Vaciar (Probar Imputación)</button>
           </div>
 
           <form id="tabularForm" class="tabular-form">
-            <div id="tabularFields" class="fields-grid"></div>
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Calcular Estratificación de Riesgo</button>
+            <div id="tabularSections" class="tabular-sections"></div>
+            <div class="form-actions sticky-mobile-cta">
+              <button type="submit" class="btn btn-primary btn-block" id="btnSubmitTabular">
+                Calcular Estratificación de Riesgo
+              </button>
             </div>
           </form>
         </div>
 
-        <div class="card">
-          <h2>Resultado Estratificación Tabular</h2>
-          <div id="tabPlaceholder" class="placeholder">
-            Completa el formulario clínico y presiona <strong>Calcular Estratificación de Riesgo</strong> para obtener la probabilidad estimada de biopsia positiva.
+        <!-- Tabular Result Column -->
+        <div class="card result-card" id="tabResultCard">
+          <div class="card-head">
+            <h2>Resultado de Estratificación Tabular</h2>
           </div>
 
-          <div id="tabResults" class="hidden">
+          <div id="tabPlaceholder" class="placeholder">
+            <div class="placeholder-icon" aria-hidden="true">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                <rect x="8" y="2" width="8" height="4" rx="1"/>
+                <line x1="9" y1="12" x2="15" y2="12"/>
+                <line x1="9" y1="16" x2="13" y2="16"/>
+              </svg>
+            </div>
+            <p>Usa uno de los perfiles rápidos o ingresa los datos clínicos y presiona <strong>Calcular Estratificación de Riesgo</strong>.</p>
+          </div>
+
+          <div id="tabResults" class="hidden fade-in">
             <div class="triage-banner" id="tabTriageBanner">
-              <div>
-                <div class="triage-label">ESTRATIFICACIÓN DE RIESGO</div>
+              <div class="triage-main">
+                <div class="triage-label">ESTRATIFICACIÓN DE RIESGO DE BIOPSIA</div>
                 <div class="triage-title" id="tabRiskTitle">—</div>
                 <div class="triage-sub" id="tabRiskDesc">—</div>
               </div>
@@ -167,7 +287,7 @@
               </div>
               <div class="threshold-track">
                 <div class="threshold-fill" id="tabProbBar"></div>
-                <div class="threshold-marker" id="tabThrMarker"></div>
+                <div class="threshold-marker" id="tabThrMarker" title="Umbral de tamizaje"></div>
               </div>
             </div>
 
@@ -175,7 +295,10 @@
             <div id="tabTopFeatures" class="prob-bars"></div>
 
             <details class="json-details">
-              <summary>Ver salida JSON estructurada (Evidencia de inferencia TRL 3)</summary>
+              <summary><span>Ver salida JSON estructurada (Evidencia TRL 3)</span></summary>
+              <div class="json-toolbar">
+                <button type="button" class="btn btn-ghost btn-xs" id="btnCopyTabJson">Copiar JSON</button>
+              </div>
               <pre id="tabRawJson"></pre>
             </details>
           </div>
@@ -183,46 +306,66 @@
       </div>
     </section>
 
-    <!-- TAB 3: EVIDENCE -->
-    <section id="tab-evidence" class="tab-panel">
+    <!-- ==================== TAB 3: EVIDENCE ==================== -->
+    <section id="tab-evidence" class="tab-panel" role="tabpanel">
       <div class="card">
-        <div class="card-header-row">
+        <div class="card-head-flex">
           <div>
             <h2>Panel de Evidencia Experimental (TRL 3)</h2>
-            <p class="muted">Métricas reproducibles generadas con <code>random_state=42</code> y validación estricta sin fuga de datos.</p>
+            <p class="muted">Métricas reproducibles (<code>random_state=42</code>), partición agrupada por lámina sin fuga de datos y validación Leave-One-Organ-Out.</p>
           </div>
-          <a href="/outputs/evidencia_trl3.json" target="_blank" class="btn btn-secondary">Descargar evidencia_trl3.json</a>
+          <a href="/outputs/evidencia_trl3.json" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">
+            Descargar evidencia_trl3.json
+          </a>
         </div>
 
         <div id="evidenceKpis" class="kpi-grid"></div>
       </div>
 
-      <div class="grid-2" style="margin-top: 18px;">
+      <div class="grid-3-evidence">
         <div class="card">
-          <h3>Módulo CNN (SIPaKMeD — 4,049 imágenes)</h3>
+          <h3>Módulo CNN (SIPaKMeD)</h3>
           <div id="cnnEvidenceSummary" class="evidence-list"></div>
         </div>
         <div class="card">
-          <h3>Módulo Tabular (Factores de Riesgo — 858 registros)</h3>
+          <h3>Módulo Tabular (Riesgo)</h3>
           <div id="tabEvidenceSummary" class="evidence-list"></div>
+        </div>
+        <div class="card">
+          <h3>Filtro de Seguridad OOD</h3>
+          <div id="oodEvidenceSummary" class="evidence-list"></div>
         </div>
       </div>
 
-      <div class="card" style="margin-top: 18px;">
-        <h3>Módulo Filtro de Validez de Dominio OOD (archivebase2 — 7 Órganos No Cervicales)</h3>
-        <div id="oodEvidenceSummary" class="evidence-list"></div>
-      </div>
-
-      <div class="card" style="margin-top: 18px;">
-        <h3>Gráficas Verificables Generadas</h3>
+      <div class="card section-gap">
+        <div class="card-head">
+          <div>
+            <h3>Gráficas Verificables Generadas</h3>
+            <p class="muted">Pulsa sobre cualquier gráfica para ampliarla a pantalla completa.</p>
+          </div>
+        </div>
         <div class="figures-grid" id="figuresGrid"></div>
       </div>
     </section>
   </main>
 
+  <!-- LIGHTBOX MODAL FOR IMAGES & CHARTS -->
+  <div id="lightboxModal" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="Vista ampliada">
+    <div class="lightbox-backdrop" id="lightboxBackdrop"></div>
+    <div class="lightbox-content">
+      <div class="lightbox-header">
+        <span id="lightboxTitle">Vista ampliada</span>
+        <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="lightbox-body">
+        <img id="lightboxImg" alt="Imagen ampliada" />
+      </div>
+    </div>
+  </div>
+
   <footer class="footer">
     <div class="container">
-      Prototipo IA-Tamizaje Cervical v0.1 • Evidencia Experimental TRL 3 • FastAPI + PyTorch (MobileNetV2) + scikit-learn
+      <p>Prototipo IA-Tamizaje Cervical v0.1 • Evidencia Experimental TRL 3 • FastAPI + PyTorch (MobileNetV2) + scikit-learn</p>
     </div>
   </footer>
 
