@@ -1,3 +1,14 @@
+---
+title: IA-Tamizaje Cervical TRL 3
+emoji: 🔬
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: Prototipo TRL 3 CNN MobileNetV2 + Grad-CAM + Filtro OOD + Tabular
+---
+
 # IA-Tamizaje Cervical (ML_cancer_utero) — Prototipo TRL 3
 
 Sistema experimental multimodal de apoyo temprano al tamizaje de **cáncer de cuello uterino (cervical)** basado en Aprendizaje Profundo (**CNN MobileNetV2 + Grad-CAM**) y Aprendizaje Automático Tabular (**RandomForest**), acompañado de una **aplicación web en FastAPI** y evidencia técnica reproducible para **TRL 3** (*Prueba de concepto analítica y experimental en entorno controlado*).

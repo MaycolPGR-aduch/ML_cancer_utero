@@ -253,22 +253,20 @@ async function loadTabularSchema() {
 function applyTabularPreset(mode) {
   if (!tabularSchemaCache) return;
   const highValues = {
-    Age: 42,
-    "Number of sexual partners": 6,
-    "First sexual intercourse": 15,
+    Age: 38,
+    "Number of sexual partners": 4,
+    "First sexual intercourse": 18,
     "Num of pregnancies": 4,
-    Smokes: 1,
-    "Smokes (years)": 15,
-    "Smokes (packs/year)": 8,
+    Smokes: 0,
+    "Smokes (years)": 0,
+    "Smokes (packs/year)": 0,
     "Hormonal Contraceptives": 1,
-    "Hormonal Contraceptives (years)": 9,
-    IUD: 0,
-    "IUD (years)": 0,
-    STDs: 1,
-    "STDs (number)": 2,
-    "STDs:condylomatosis": 1,
-    "STDs:HPV": 1,
-    "STDs: Number of diagnosis": 2,
+    "Hormonal Contraceptives (years)": 16,
+    IUD: 1,
+    "IUD (years)": 3,
+    STDs: 0,
+    "STDs (number)": 0,
+    "STDs: Number of diagnosis": 0,
   };
   document.querySelectorAll("[data-feature]").forEach((el) => {
     const name = el.dataset.feature;

@@ -298,11 +298,16 @@ def list_samples():
     return {"samples": samples, "ood_samples": ood_samples}
 
 
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # Limite 10 MB para despliegues publicos
+
+
 @app.post("/api/predict/image")
 async def predict_image_upload(file: UploadFile = File(...)):
     contents = await file.read()
     if not contents:
         raise HTTPException(status_code=400, detail="Archivo de imagen vacio.")
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="La imagen supera el limite maximo permitido de 10 MB.")
     try:
         pil_img = Image.open(io.BytesIO(contents))
         pil_img.load()

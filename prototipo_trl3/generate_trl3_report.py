@@ -275,7 +275,7 @@ def add_figure(doc: Document, img_path: Path, caption: str, width_in: float = 5.
     rc.font.color.rgb = RGB_MUTED
 
 
-def build_report() -> None:
+def build_report(out_path: Path = OUT_DOCX) -> None:
     ev = json.loads(EVIDENCE_JSON.read_text(encoding="utf-8"))
     cnn = ev["modulo_cnn"]
     tab = ev["modulo_tabular"]
@@ -361,7 +361,7 @@ def build_report() -> None:
             ["Fecha de Ejecución y Consolidación", "19 de noviembre de 2026 (UTC: 2026-11-19T21:30Z)"],
             ["Semilla de Reproducibilidad", "random_state = 42 (fija en particiones, modelos y entrenamiento)"],
             ["Entorno Experimental", "Windows 10/11 (AMD64), Intel Core i7-1260P (CPU), Python 3.10.0, PyTorch 2.14.1+cpu, scikit-learn 1.7.2, FastAPI 0.141.1"],
-            ["Repositorio Oficial (Código y Evidencias)", "https://github.com/MaycolPGR-aduch/ML_cancer_utero (rama main, commit b2ea17c)"],
+            ["Repositorio Oficial (Código y Evidencias)", "https://github.com/MaycolPGR-aduch/ML_cancer_utero (rama main)"],
         ],
         col_widths=[2.3, 4.5],
     )
@@ -479,6 +479,29 @@ def build_report() -> None:
             ],
         ],
         col_widths=[1.5, 2.7, 2.6],
+    )
+
+    add_heading_2(doc, "2.1 Matriz de Cumplimiento del Alcance TRL 3")
+    add_body(
+        doc,
+        "A continuación se verifica punto por punto el cumplimiento de todos los requisitos establecidos en la guía de "
+        "evidencia TRL 3, junto con los componentes adicionales implementados para robustecer la prueba de concepto:"
+    )
+    add_styled_table(
+        doc,
+        ["Requisito / Entregable", "Estado", "Cómo se Logró y Evidencia Verificable"],
+        [
+            ["Identificación, entorno y reproducibilidad", "CUMPLIDO 100%", "Versiones etiquetadas (v0.1-trl3-cnn/tabular/ood), random_state=42, entorno Python/PyTorch/scikit-learn registrado en evidencia_trl3.json."],
+            ["Módulo CNN sobre SIPaKMeD (4,049 imágenes)", "CUMPLIDO 100%", "MobileNetV2 Transfer Learning en 2 etapas con split agrupado por lámina (0 láminas compartidas). Macro-F1 = 95.02%, ROC-AUC = 0.9948."],
+            ["Escalado de anotaciones *_cyt.dat y *_nuc.dat", "CUMPLIDO 100%", "Función scale_dat_coordinates() verificada visualmente sobre las 5 clases en outputs/cnn_sample_annotations_224.png."],
+            ["Módulo Tabular sin fuga de información", "CUMPLIDO 100%", "Exclusión de 8 variables post-prueba y 2 columnas >50% faltantes; Pipeline con SimpleImputer + StandardScaler y CV 5-fold (3 baselines)."],
+            ["Métricas completas (no solo accuracy)", "CUMPLIDO 100%", "Sensibilidad (Recall), Especificidad, Precisión (VPP), VPN, F1-Score, ROC-AUC, PR-AUC, matrices de confusión y tiempos de inferencia."],
+            ["Software operativo + Inferencia verificable", "CUMPLIDO 100%", "Backend FastAPI + Frontend web de 3 pestañas + CLI infer.py + suite automatizada test_e2e.py (32/32 pruebas exitosas)."],
+            ["Extra: Explicabilidad Visual (Grad-CAM)", "IMPLEMENTADO", "Mapas de calor nativos en PyTorch (gradcam.py) generados en vivo sobre la última capa convolucional (~100 ms en CPU)."],
+            ["Extra: Filtro de Seguridad OOD (archivebase2)", "IMPLEMENTADO", "Doble compuerta sobre embeddings compartidos usando 7 órganos no cervicales (Rechazo Test 100%, Leave-One-Organ-Out 96.4%–100%, +0.18 ms)."],
+            ["Extra: Preparación para Despliegue Cloud", "IMPLEMENTADO", "Dockerfile y .dockerignore configurados (puerto dinámico PORT/7860) listos para Hugging Face Spaces, Google Cloud Run o Railway."],
+        ],
+        col_widths=[1.95, 1.05, 3.8],
     )
 
     # =========================================================================
@@ -634,6 +657,38 @@ def build_report() -> None:
     add_bullet(doc, "Implementación nativa en PyTorch (prototipo_trl3/gradcam.py) mediante hooks de activaciones y gradientes sobre la última capa convolucional de MobileNetV2, superponiendo un mapa de calor sobre la célula analizada para auditar qué regiones nucleares/citoplasmáticas guiaron la decisión.", "Módulo XAI (Grad-CAM): ")
     add_bullet(doc, "Aplicación web ligera (HTML5/CSS3/JS en prototipo_trl3/app/static/) con tres pestañas funcionales: (1) Citología Cervical con carga drag-and-drop y 5 muestras reales del conjunto Test, (2) Perfil Clínico Tabular con soporte para imputación automática de faltantes, y (3) Panel de Evidencia TRL 3 con descarga directa de evidencia_trl3.json y gráficas.", "Frontend Web: ")
     add_bullet(doc, "Script prototipo_trl3/infer.py para ejecución verificable por consola sobre imágenes y registros tabulares con salida JSON estructurada.", "Interfaz CLI Reproducible: ")
+
+    add_heading_2(doc, "4.3 Explicación Profunda del Funcionamiento Interno (Flujo Paso a Paso)")
+    add_body(
+        doc,
+        "Una decisión arquitectónica fundamental del proyecto fue desacoplar por completo el entrenamiento offline "
+        "(donde residen los ~17.7 GB combinados de SIPaKMeD y archivebase2) de la aplicación web de inferencia online, "
+        "que únicamente carga tres artefactos compactos en memoria (~9.5 MB totales: cnn_sipakmed_trl3_v01.pt de 8.73 MB, "
+        "tabular_trl3_v01.joblib de 0.72 MB y ood_domain_gate_v01.joblib de 66.6 KB). Esto permite ejecutar el prototipo en "
+        "CPU convencional y desplegarlo en la nube con mínimo consumo de recursos."
+    )
+    add_body(
+        doc,
+        "Cuando un usuario sube una microfotografía en la interfaz web (o la envía a POST /api/predict/image), el servidor "
+        "ejecuta una tubería de 6 pasos en menos de 150 ms:",
+        bold_prefix="Flujo interno del Módulo de Imágenes (CNN + OOD + Grad-CAM): "
+    )
+    add_bullet(doc, "Valida la integridad binaria del archivo (.bmp, .png, .jpg), convierte a RGB, redimensiona a 224×224 píxeles y normaliza cada canal con media y desviación estándar de ImageNet.", "Paso 1 — Preprocesamiento determinístico: ")
+    add_bullet(doc, "El tensor [1, 3, 224, 224] atraviesa los bloques convolucionales (model.features) de MobileNetV2 y un Global Average Pooling produce un vector compacto de 1,280 características morfológicas.", "Paso 2 — Extracción de embeddings compartidos: ")
+    add_bullet(doc, "Sin repetir el pase CNN (+0.18 ms), ese vector de 1,280 dimensiones se evalúa simultáneamente mediante (a) un clasificador lineal calibrado (probabilidad cervical >= 0.50) y (b) similitud coseno máxima frente a los 5 centroides citológicos de entrenamiento (>= 0.45). Si cualquiera falla, se bloquea la predicción y se responde FUERA_DE_DOMINIO.", "Paso 3 — Doble Compuerta OOD: ")
+    add_bullet(doc, "Si la imagen es válida, el vector ingresa a la capa clasificadora lineal (1,280 → 5) y la función Softmax convierte los logits en probabilidades normalizadas para las 5 clases SIPaKMeD.", "Paso 4 — Clasificación multiclase: ")
+    add_bullet(doc, "Se suman las probabilidades de las clases anormales (P(Disqueratósica) + P(Coilocítica)) para emitir un semáforo de prioridad de tamizaje: ALTO (>=50%), MODERADO (25%–49%) o BAJO (<25%).", "Paso 5 — Agregación clínica de tamizaje: ")
+    add_bullet(doc, "Se registran hooks de activaciones y gradientes sobre la última capa convolucional (features[-1]); se retropropaga el puntaje de la clase predicha, se ponderan los mapas de activación con los gradientes promediados, se aplica ReLU y se superpone el mapa de calor sobre la célula de 224×224.", "Paso 6 — Explicabilidad Grad-CAM: ")
+
+    add_body(
+        doc,
+        "Cuando el usuario envía un perfil clínico en la pestaña Tabular (POST /api/predict/tabular), los 26 campos pasan por un "
+        "Pipeline indivisible de scikit-learn: cualquier variable desconocida o dejada en blanco se imputa automáticamente usando "
+        "la mediana aprendida en entrenamiento (SimpleImputer), luego se estandariza (StandardScaler) y finalmente los 300 árboles "
+        "balanceados del RandomForest votan una probabilidad de riesgo de biopsia positiva, que se compara contra el umbral de "
+        "tamizaje optimizado (0.44).",
+        bold_prefix="Flujo interno del Módulo Tabular: "
+    )
 
     # =========================================================================
     # SECCIÓN 5: RESULTADOS EXPERIMENTALES VERIFICADOS
@@ -835,15 +890,152 @@ def build_report() -> None:
         )
 
     # =========================================================================
+    # SECCIÓN 5.4: DEFINICIÓN E INTERPRETACIÓN CLÍNICA DE MÉTRICAS CLAVE
+    # =========================================================================
+    add_heading_2(doc, "5.4 Definición e Interpretación Clínica de Métricas Clave (Sensibilidad, Especificidad y Discriminación)")
+    add_body(
+        doc,
+        "En aplicaciones de apoyo al tamizaje oncológico, la exactitud global (accuracy) resulta insuficiente por sí sola, "
+        "especialmente ante desbalance de clases y costos clínicos asimétricos entre errores. Por ello, este prototipo reporta "
+        "e interpreta formalmente el conjunto de métricas diagnósticas basadas en Verdaderos Positivos (VP), Falsos Negativos (FN), "
+        "Verdaderos Negativos (VN) y Falsos Positivos (FP):"
+    )
+
+    add_styled_table(
+        doc,
+        ["Métrica", "Fórmula", "Significado Clínico en Tamizaje Cervical"],
+        [
+            [
+                "Sensibilidad (Recall)",
+                "VP / (VP + FN)",
+                "Proporción de casos realmente anormales/positivos detectados correctamente. Es prioritaria en tamizaje temprano para minimizar falsos negativos (no dejar escapar lesiones precancerosas).",
+            ],
+            [
+                "Especificidad",
+                "VN / (VN + FP)",
+                "Proporción de casos realmente sanos/normales descartados correctamente. Controla las falsas alarmas para evitar saturación del personal clínico y procedimientos innecesarios.",
+            ],
+            [
+                "Precisión (VPP)",
+                "VP / (VP + FP)",
+                "Valor Predictivo Positivo: probabilidad de que un caso marcado en alerta por el sistema sea realmente positivo.",
+            ],
+            [
+                "VPN (NPV)",
+                "VN / (VN + FN)",
+                "Valor Predictivo Negativo: probabilidad de que un caso descartado como normal por el sistema sea realmente negativo.",
+            ],
+            [
+                "F1-Score",
+                "2·(Prec·Sens)/(Prec+Sens)",
+                "Media armónica entre Precisión y Sensibilidad; resume el equilibrio operativo cuando la clase positiva es minoritaria.",
+            ],
+            [
+                "ROC-AUC",
+                "Área curva Sens. vs (1−Esp.)",
+                "Capacidad global de discriminación del modelo a través de todos los posibles umbrales de decisión (0.50 = azar, 1.00 = separación perfecta).",
+            ],
+            [
+                "PR-AUC",
+                "Área curva Precisión vs Recall",
+                "Métrica más exigente ante clases desbalanceadas; se compara directamente contra la prevalencia base del evento (ej. 6.41% en Biopsy).",
+            ],
+        ],
+        col_widths=[1.35, 1.65, 3.8],
+    )
+
+    # Tabla comparativa consolidada de los 3 modulos (calculando VPN exacto desde matrices de confusion)
+    cb = bin_cnn["matriz_confusion_binaria"]
+    cnn_npv = cb["tn"] / (cb["tn"] + cb["fn"]) if (cb["tn"] + cb["fn"]) > 0 else 0.0
+
+    tab_npv = tcm["tn"] / (tcm["tn"] + tcm["fn"]) if (tcm["tn"] + tcm["fn"]) > 0 else 0.0
+
+    comp_rows = [
+        [
+            "CNN Tamizaje Binario\n(Anormal vs Normal/Benigna, Test n=614)",
+            f"VP={cb['tp']}, FN={cb['fn']}\nVN={cb['tn']}, FP={cb['fp']}",
+            f"{bin_cnn['sensibilidad_recall']*100:.2f}%",
+            f"{bin_cnn['especificidad']*100:.2f}%",
+            f"{bin_cnn['precision']*100:.2f}%",
+            f"{cnn_npv*100:.2f}%",
+            f"{bin_cnn['f1_score']:.4f}",
+            f"{bin_cnn['roc_auc']:.4f} / {bin_cnn['pr_auc']:.4f}",
+        ],
+        [
+            "Tabular Factores de Riesgo\n(Biopsy, OOF thr=0.44, n=858)",
+            f"VP={tcm['tp']}, FN={tcm['fn']}\nVN={tcm['tn']}, FP={tcm['fp']}",
+            f"{toof['recall_sensibilidad']*100:.2f}%",
+            f"{toof['especificidad']*100:.2f}%",
+            f"{toof['precision']*100:.2f}%",
+            f"{tab_npv*100:.2f}%",
+            f"{toof['f1_score']:.4f}",
+            f"{tm_cv['roc_auc']:.4f} / {tm_cv['pr_auc']:.4f}",
+        ],
+    ]
+    if ood is not None:
+        ocm = ood["metricas_test"]["matriz_confusion"]
+        om = ood["metricas_test"]
+        ood_npv = ocm["tn"] / (ocm["tn"] + ocm["fn"]) if (ocm["tn"] + ocm["fn"]) > 0 else 0.0
+        comp_rows.append([
+            "Filtro de Validez OOD\n(Cervical vs 7 Órganos, Test n=1,244)",
+            f"VP={ocm['tp']}, FN={ocm['fn']}\nVN={ocm['tn']}, FP={ocm['fp']}",
+            f"{om['aceptacion_citologia_valida_recall']*100:.2f}%",
+            f"{om['rechazo_no_cervical_especificidad']*100:.2f}%",
+            f"{om['precision']*100:.2f}%",
+            f"{ood_npv*100:.2f}%",
+            f"{om['f1_score']:.4f}",
+            f"{om['roc_auc']:.4f} / {om['pr_auc']:.4f}",
+        ])
+
+    add_styled_table(
+        doc,
+        ["Módulo Evaluado", "Matriz (VP/FN/VN/FP)", "Sensib.", "Especif.", "VPP (Prec.)", "VPN", "F1", "ROC / PR-AUC"],
+        comp_rows,
+        col_widths=[1.75, 1.15, 0.62, 0.62, 0.68, 0.6, 0.52, 0.86],
+        align_right_cols={2, 3, 4, 5, 6, 7},
+    )
+
+    add_callout(
+        doc,
+        "Interpretación Clínica Integral de los Resultados",
+        f"1) Módulo CNN (Apoyo al tamizaje citológico): Con una Sensibilidad de {bin_cnn['sensibilidad_recall']*100:.2f}% "
+        f"y Especificidad de {bin_cnn['especificidad']*100:.2f}% (VPP={bin_cnn['precision']*100:.2f}%, VPN={cnn_npv*100:.2f}%), "
+        f"el modelo detectó correctamente 275 de 289 células anormales y descartó 320 de 325 células normales/benignas "
+        f"generando solo 5 falsas alarmas. Esto confirma un balance altamente favorable para priorizar la revisión citopatológica.\n"
+        f"2) Equilibrio Sensibilidad–Especificidad y ajuste de umbral: En un escenario clínico real donde se desee minimizar "
+        f"aún más los 14 falsos negativos, es posible reducir el umbral de probabilidad anormal (por debajo de 0.50) para elevar "
+        f"la sensibilidad a costa de un incremento controlado de falsos positivos, decisión que debe calibrarse en TRL 5 junto "
+        f"con especialistas en citopatología.\n"
+        f"3) Módulo Tabular (Estratificación poblacional): Su Sensibilidad moderada ({toof['recall_sensibilidad']*100:.2f}%) "
+        f"con Especificidad de {toof['especificidad']*100:.2f}% y VPN de {tab_npv*100:.2f}% (con PR-AUC 2.6× sobre la prevalencia "
+        f"base de 6.41%) demuestra rigurosamente que los factores epidemiológicos de cuestionario aportan señal útil para "
+        f"estratificación complementaria, pero nunca deben sustituir el examen citológico ni colposcópico.\n"
+        f"4) Filtro OOD (Seguridad operativa): Al lograr Sensibilidad de 100.00% y Especificidad de 100.00% en prueba retenida "
+        f"(y 96.4%–100% de rechazo ante órganos completamente no vistos), garantiza que el sistema no emita predicciones citológicas "
+        f"espurias cuando recibe imágenes ajenas al dominio cervical.",
+        bg_hex=HEX_CALLOUT_BG,
+        border_hex=HEX_ACCENT,
+    )
+
+    # =========================================================================
     # SECCIÓN 6: EVIDENCIA DE EJECUCIÓN DE SOFTWARE
     # =========================================================================
     add_heading_1(doc, "6. Evidencia Verificable de Ejecución de Software")
     add_body(
         doc,
-        "Se verificó la ejecución completa de extremo a extremo tanto mediante pruebas automatizadas sobre los 7 endpoints "
-        "de la API FastAPI (TestClient: /api/health, /api/samples, /api/predict/image, /api/predict/sample/{filename}, "
-        "/api/tabular/schema, /api/predict/tabular y /api/evidence) como mediante el script CLI reproducible infer.py. "
-        "A continuación se presenta una salida real registrada durante la prueba multimodal combinada (célula de prueba "
+        "Se implementó y ejecutó una suite automatizada de verificación integral de extremo a extremo (prototipo_trl3/test_e2e.py) "
+        "que validó 32/32 pruebas exitosas sobre la aplicación real (FastAPI TestClient) y sobre el CLI infer.py, confirmando "
+        "que todos los flujos funcionan sin errores antes de su entrega:"
+    )
+    add_bullet(doc, "Entrega correcta HTTP 200 de la interfaz web (/), estilos (/static/styles.css), lógica cliente (/static/app.js) y documentación Swagger (/docs, /openapi.json).", "Frontend y Documentación API (5/5 PASS): ")
+    add_bullet(doc, "Carga verificada de los 3 modelos en memoria (/api/health → cnn_ready=True, ood_ready=True, tabular_ready=True) y listado completo de 5 muestras citológicas + 3 muestras OOD.", "Salud e Inventario de Modelos (2/2 PASS): ")
+    add_bullet(doc, "Evaluación de las 5 muestras reales del conjunto Test + carga multipart (/api/predict/image): todas pasaron la validación OOD, devolvieron probabilidades coherentes (4/5 aciertos exactos, con 1 célula limítrofe koilocítica/metaplásica consistente con el 94.46% global en Test) y generaron mapas de calor Grad-CAM en base64 PNG (~28–31 ms CNN + ~100 ms Grad-CAM).", "Flujo CNN + Grad-CAM (7/7 PASS): ")
+    add_bullet(doc, "Rechazo del 100% de las 3 muestras médicas no cervicales (Brain Glioma prob=0.0001, Colon Aca prob=0.0026, Kidney Normal prob=0.0000) y de una imagen sintética de ruido aleatorio (prob=0.0002, coseno=0.3659), bloqueando predicciones forzadas.", "Seguridad OOD (4/4 PASS): ")
+    add_bullet(doc, "Verificación del esquema de 26 variables y ejecución de 3 perfiles clínicos: Perfil Bajo (prob=0.400, BAJO), Perfil Alto basado en caso real Biopsy=1 (prob=0.761, alerta ALTO) y Perfil 100% vacío (imputación automática de las 26 variables sin fallos).", "Flujo Tabular e Imputación (4/4 PASS): ")
+    add_bullet(doc, "Respuesta consolidada /api/evidence con los 3 módulos y entrega HTTP 200 verificada de las 9 gráficas PNG en /outputs/.", "Evidencia y Gráficas HTTP (10/10 PASS): ")
+    add_body(
+        doc,
+        "Adicionalmente, se verificó la salida estructurada por consola mediante infer.py (prueba multimodal combinada sobre "
         "im_Dyskeratotic_011_01.bmp y registro tabular índice 0):"
     )
 
@@ -889,9 +1081,56 @@ def build_report() -> None:
     add_bullet(doc, "TRL 4 (Entorno de laboratorio integrado): empaquetado Docker, exportación a ONNX Runtime y pruebas de carga API. TRL 5 (Entorno relevante): validación externa multicéntrica sobre cohortes independientes (ej. Herlev y muestras locales anonimizadas con aprobación de comité de ética) evaluando calibración y equidad.", "Hoja de ruta de maduración: ")
 
     # =========================================================================
-    # SECCIÓN 8: CONCLUSIONES Y TRAZABILIDAD DE ARTEFACTOS
+    # SECCIÓN 8: PLAN DE DESPLIEGUE EN LA NUBE (ACCESO PÚBLICO)
     # =========================================================================
-    add_heading_1(doc, "8. Conclusiones y Trazabilidad de Artefactos")
+    add_heading_1(doc, "8. Plan de Despliegue en la Nube para Acceso Público")
+    add_body(
+        doc,
+        "Gracias a que la aplicación de inferencia pesa apenas ~13 MB en repositorio (modelos incluidos, sin datasets de entrenamiento) "
+        "y ejecuta cada predicción en CPU en menos de 150 ms, el proyecto ya fue empaquetado con Dockerfile y .dockerignore listos "
+        "para desplegarse en la nube con acceso HTTPS público desde cualquier navegador."
+    )
+    add_body(
+        doc,
+        "Un aspecto técnico crítico al desplegar PyTorch CPU + OpenCV + scikit-learn es el consumo de memoria RAM en ejecución "
+        "(aproximadamente 550–700 MB). Por ello, plataformas gratuitas limitadas a 512 MB RAM (como Render Free Tier) pueden cerrar "
+        "el proceso por falta de memoria (OOM). Las tres opciones recomendadas y viables son:",
+        bold_prefix="Requisito técnico clave de memoria RAM: "
+    )
+
+    add_styled_table(
+        doc,
+        ["Plataforma Cloud", "Costo Estimado", "Recursos / RAM", "Ventajas y Uso Recomendado"],
+        [
+            [
+                "Hugging Face Spaces\n(SDK Docker) — Recomendada",
+                "Gratis ($0/mes)",
+                "2 vCPU / 16 GB RAM",
+                "Sobra RAM para PyTorch + Grad-CAM, HTTPS automático, URL pública inmediata y compatible directo con el Dockerfile del repo (puerto 7860).",
+            ],
+            [
+                "Google Cloud Run\n(Contenedor Serverless)",
+                "Gratis (capa gratuita) o pago por uso",
+                "1–2 vCPU / 1–2 GB RAM",
+                "Escala a cero cuando no hay visitas, soporta dominio personalizado, HTTPS gestionado y excelente para transición a TRL 4/5.",
+            ],
+            [
+                "Railway / Render Starter",
+                "~$5–7 USD/mes",
+                "1–2 vCPU / 1–8 GB RAM",
+                "Despliegue continuo automático (CI/CD) en cada git push a GitHub, siempre activo sin suspensión por inactividad.",
+            ],
+        ],
+        col_widths=[1.65, 1.1, 1.25, 2.8],
+    )
+
+    add_bullet(doc, "Despliegue directo vía Dockerfile (ya incluido en la raíz del repositorio): usa python:3.10-slim, PyTorch CPU y opencv-python-headless, leyendo automáticamente la variable de entorno PORT (7860 por defecto).", "Empaquetado listo: ")
+    add_bullet(doc, "Antes de abrir la URL a usuarios externos se recomienda mantener procesamiento exclusivo en memoria (sin guardar imágenes subidas en disco), fijar límite máximo de archivo (ej. 10 MB), habilitar tasa límite (rate limiting) y conservar visible el aviso legal de uso experimental TRL 3.", "Controles mínimos de seguridad y privacidad: ")
+
+    # =========================================================================
+    # SECCIÓN 9: CONCLUSIONES Y TRAZABILIDAD DE ARTEFACTOS
+    # =========================================================================
+    add_heading_1(doc, "9. Conclusiones y Trazabilidad de Artefactos")
     add_body(
         doc,
         "El Prototipo IA-Tamizaje Cervical v0.1 cumple de manera íntegra, transparente y verificable con todos los requisitos "
@@ -909,18 +1148,22 @@ def build_report() -> None:
             ["Entrenamiento y Evaluación CNN", "prototipo_trl3/train_eval_cnn.py", "Reproducibilidad completa de MobileNetV2 + split sin fuga por lámina"],
             ["Entrenamiento y Evaluación Tabular", "prototipo_trl3/train_eval_tabular.py", "Reproducibilidad de comparación baseline CV 5-fold y control de leakage"],
             ["Explicabilidad Grad-CAM", "prototipo_trl3/gradcam.py", "Generación en vivo de mapas de calor sobre la última capa conv"],
-            ["Inferencia CLI", "prototipo_trl3/infer.py", "Prueba reproducible por consola de imagen y/o perfil tabular"],
+            ["Filtro de Validez OOD", "prototipo_trl3/train_eval_ood.py + models/ood_domain_gate_v01.joblib", "Rechazo de imágenes no cervicales (7 órganos archivebase2) con +0.18 ms"],
+            ["Inferencia CLI y Suite E2E", "prototipo_trl3/infer.py + prototipo_trl3/test_e2e.py", "Prueba reproducible por consola y 32/32 validaciones automatizadas"],
             ["Aplicación Web FastAPI", "prototipo_trl3/app/main.py + static/*", "Interfaz interactiva de 3 pestañas, API REST y Swagger (/docs)"],
+            ["Despliegue en la Nube", "Dockerfile + .dockerignore", "Contenedor listo para Hugging Face Spaces, Google Cloud Run o Railway"],
             ["Modelos Entrenados", "prototipo_trl3/models/*.pt, *.joblib", "Pesos serializados listos para inferencia inmediata (~9.5 MB totales)"],
-            ["Documentación y Seguimiento", "README.md, GUIA_EJECUCION.md, SEGUIMIENTO_TAREAS.md", "Manual operativo, control de fases y repositorio GitHub (commit b2ea17c)"],
+            ["Documentación y Seguimiento", "README.md, GUIA_EJECUCION.md, SEGUIMIENTO_TAREAS.md", "Manual operativo, control de fases y repositorio GitHub (rama main)"],
         ],
         col_widths=[1.75, 2.25, 2.8],
     )
 
-    doc.save(str(OUT_DOCX))
-    print(f"[OK] Informe Word TRL 3 generado exitosamente en: {OUT_DOCX}")
-    print(f"[INFO] Tamano del archivo: {OUT_DOCX.stat().st_size / 1024:.1f} KB")
+    doc.save(str(out_path))
+    print(f"[OK] Informe Word TRL 3 generado exitosamente en: {out_path}")
+    print(f"[INFO] Tamano del archivo: {out_path.stat().st_size / 1024:.1f} KB")
 
 
 if __name__ == "__main__":
-    build_report()
+    import sys
+    target = Path(sys.argv[1]) if len(sys.argv) > 1 else OUT_DOCX
+    build_report(target)

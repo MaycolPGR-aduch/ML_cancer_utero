@@ -1,0 +1,13 @@
+.git/
+.gitignore
+.venv/
+venv/
+__pycache__/
+*.pyc
+archive_base1/
+archive_base1.zip
+archivebase2/
+drive-download-*.zip
+*.zip
+*.docx
+*.log
