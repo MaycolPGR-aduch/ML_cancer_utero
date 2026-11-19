@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Instalador Nativo (sin Docker) para Rocky Linux 8/9
+# Instalador Nativo (sin Docker) para Rocky Linux 8 / 9 / 10
 # Prototipo IA-Tamizaje Cervical v0.1 (TRL 3)
 # ==============================================================================
 set -euo pipefail
@@ -10,12 +10,30 @@ SERVICE_NAME="ia-cervical"
 PORT="${PORT:-8000}"
 RUN_USER="${SUDO_USER:-$USER}"
 
-echo "=== [1/6] Instalando paquetes base del sistema (Python 3.11, git, glib2) ==="
-sudo dnf install -y git python3.11 python3.11-pip glib2
+echo "=== [1/6] Detectando Python >= 3.10 e instalando paquetes base ==="
+sudo dnf install -y git glib2 python3 python3-pip
 
-echo "=== [2/6] Preparando entorno virtual Python 3.11 en ${APP_DIR}/.venv ==="
+PYTHON_BIN=""
+for candidate in python3 python3.12 python3.11; do
+    if command -v "${candidate}" >/dev/null 2>&1; then
+        if "${candidate}" -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)"; then
+            PYTHON_BIN="${candidate}"
+            break
+        fi
+    fi
+done
+
+if [ -z "${PYTHON_BIN}" ]; then
+    echo "[INFO] python3 del sistema es < 3.10; instalando python3.11..."
+    sudo dnf install -y python3.11 python3.11-pip
+    PYTHON_BIN="python3.11"
+fi
+
+echo "[OK] Usando interprete: ${PYTHON_BIN} ($(${PYTHON_BIN} --version))"
+
+echo "=== [2/6] Preparando entorno virtual en ${APP_DIR}/.venv ==="
 cd "${APP_DIR}"
-python3.11 -m venv .venv
+"${PYTHON_BIN}" -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 
