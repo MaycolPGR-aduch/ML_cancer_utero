@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IA-Tamizaje Cervical v0.1 | Prototipo TRL 3</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <div class="brand">
+        <div class="brand-badge">TRL 3</div>
+        <div>
+          <h1>IA-Tamizaje Cervical <span class="version-tag">v0.1</span></h1>
+          <p class="subtitle">Prototipo experimental multimodal: Citología CNN (SIPaKMeD) + Factores de Riesgo Tabular</p>
+        </div>
+      </div>
+      <div class="status-pills" id="statusPills">
+        <span class="pill pill-loading">Conectando API...</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="disclaimer-bar">
+    <div class="container">
+      <strong>Aviso Clínico y Regulatorio (TRL 3):</strong>
+      Este software es una prueba de concepto analítica y experimental en entorno controlado para apoyo temprano al tamizaje.
+      <strong>No sustituye la evaluación citopatológica ni constituye un diagnóstico médico definitivo.</strong>
+    </div>
+  </div>
+
+  <main class="container">
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="cnn" role="tab">1. Citología Cervical (CNN + Grad-CAM)</button>
+      <button class="tab" data-tab="tabular" role="tab">2. Factores de Riesgo (Tabular)</button>
+      <button class="tab" data-tab="evidence" role="tab">3. Evidencia Experimental TRL 3</button>
+    </nav>
+
+    <!-- TAB 1: CNN -->
+    <section id="tab-cnn" class="tab-panel active">
+      <div class="grid-2">
+        <div class="card">
+          <h2>Subir Imagen Citológica</h2>
+          <p class="muted">Formatos soportados: <code>.bmp</code>, <code>.png</code>, <code>.jpg</code>. La imagen se redimensiona a <code>224×224</code> y se normaliza automáticamente antes de pasar por MobileNetV2.</p>
+
+          <div id="dropzone" class="dropzone">
+            <input type="file" id="imageInput" accept="image/*,.bmp" hidden />
+            <div class="dropzone-icon">🔬</div>
+            <p class="dropzone-title">Arrastra una imagen aquí o haz clic para seleccionar</p>
+            <p class="dropzone-hint">Células individuales recortadas (SIPaKMeD u otras citologías)</p>
+          </div>
+
+          <div class="samples-box">
+            <h3>O prueba con muestras reales del conjunto de prueba (Test):</h3>
+            <div id="sampleButtons" class="sample-buttons">
+              <span class="muted">Cargando muestras...</span>
+            </div>
+          </div>
+
+          <div id="cnnError" class="alert alert-error hidden"></div>
+        </div>
+
+        <div class="card" id="cnnResultCard">
+          <h2>Resultado de Inferencia CNN</h2>
+          <div id="cnnPlaceholder" class="placeholder">
+            Sube una imagen o selecciona una muestra de prueba para ejecutar la clasificación y generar el mapa de calor Grad-CAM.
+          </div>
+
+          <div id="cnnResults" class="hidden">
+            <div class="triage-banner" id="cnnTriageBanner">
+              <div>
+                <div class="triage-label">NIVEL DE PRIORIDAD DE TAMIZAJE</div>
+                <div class="triage-title" id="cnnPredTitle">—</div>
+                <div class="triage-sub" id="cnnPredDesc">—</div>
+              </div>
+              <div class="triage-score">
+                <div class="score-value" id="cnnAbnormalProb">—</div>
+                <div class="score-caption">Prob. Anormal</div>
+              </div>
+            </div>
+
+            <div class="meta-row" id="cnnMetaRow"></div>
+
+            <div class="visual-compare">
+              <div class="img-box">
+                <div class="img-caption">Entrada Preprocesada (224×224)</div>
+                <img id="cnnPreviewImg" alt="Entrada 224x224" />
+              </div>
+              <div class="img-box">
+                <div class="img-caption">Explicabilidad Grad-CAM (Zonas de Atención)</div>
+                <img id="cnnGradcamImg" alt="Grad-CAM Overlay" />
+              </div>
+            </div>
+
+            <h3 class="section-sub">Distribución de Probabilidades (5 Clases SIPaKMeD)</h3>
+            <div id="cnnProbBars" class="prob-bars"></div>
+
+            <details class="json-details">
+              <summary>Ver salida JSON estructurada (Evidencia de inferencia TRL 3)</summary>
+              <pre id="cnnRawJson"></pre>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: TABULAR -->
+    <section id="tab-tabular" class="tab-panel">
+      <div class="grid-2 tabular-layout">
+        <div class="card">
+          <div class="card-header-row">
+            <div>
+              <h2>Perfil Clínico de Factores de Riesgo</h2>
+              <p class="muted">Variables clínicas sin fuga de información (excluye desenlaces post-prueba y columnas con &gt;50% ausentes). Los campos vacíos se imputan automáticamente por mediana en el pipeline.</p>
+            </div>
+          </div>
+
+          <div class="preset-bar">
+            <button type="button" class="btn btn-secondary" id="btnPresetLow">Cargar Perfil Bajo</button>
+            <button type="button" class="btn btn-secondary" id="btnPresetHigh">Cargar Perfil Alto</button>
+            <button type="button" class="btn btn-ghost" id="btnPresetEmpty">Vaciar (Probar Imputación)</button>
+          </div>
+
+          <form id="tabularForm" class="tabular-form">
+            <div id="tabularFields" class="fields-grid"></div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Calcular Estratificación de Riesgo</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2>Resultado Estratificación Tabular</h2>
+          <div id="tabPlaceholder" class="placeholder">
+            Completa el formulario clínico y presiona <strong>Calcular Estratificación de Riesgo</strong> para obtener la probabilidad estimada de biopsia positiva.
+          </div>
+
+          <div id="tabResults" class="hidden">
+            <div class="triage-banner" id="tabTriageBanner">
+              <div>
+                <div class="triage-label">ESTRATIFICACIÓN DE RIESGO</div>
+                <div class="triage-title" id="tabRiskTitle">—</div>
+                <div class="triage-sub" id="tabRiskDesc">—</div>
+              </div>
+              <div class="triage-score">
+                <div class="score-value" id="tabProbVal">—</div>
+                <div class="score-caption">Prob. Riesgo</div>
+              </div>
+            </div>
+
+            <div class="meta-row" id="tabMetaRow"></div>
+
+            <div class="threshold-box">
+              <div class="threshold-header">
+                <span>Probabilidad estimada vs. Umbral de tamizaje</span>
+                <strong id="tabThrText">—</strong>
+              </div>
+              <div class="threshold-track">
+                <div class="threshold-fill" id="tabProbBar"></div>
+                <div class="threshold-marker" id="tabThrMarker"></div>
+              </div>
+            </div>
+
+            <h3 class="section-sub">Variables con Mayor Peso en el Modelo</h3>
+            <div id="tabTopFeatures" class="prob-bars"></div>
+
+            <details class="json-details">
+              <summary>Ver salida JSON estructurada (Evidencia de inferencia TRL 3)</summary>
+              <pre id="tabRawJson"></pre>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: EVIDENCE -->
+    <section id="tab-evidence" class="tab-panel">
+      <div class="card">
+        <div class="card-header-row">
+          <div>
+            <h2>Panel de Evidencia Experimental (TRL 3)</h2>
+            <p class="muted">Métricas reproducibles generadas con <code>random_state=42</code> y validación estricta sin fuga de datos.</p>
+          </div>
+          <a href="/outputs/evidencia_trl3.json" target="_blank" class="btn btn-secondary">Descargar evidencia_trl3.json</a>
+        </div>
+
+        <div id="evidenceKpis" class="kpi-grid"></div>
+      </div>
+
+      <div class="grid-2" style="margin-top: 18px;">
+        <div class="card">
+          <h3>Módulo CNN (SIPaKMeD — 4,049 imágenes)</h3>
+          <div id="cnnEvidenceSummary" class="evidence-list"></div>
+        </div>
+        <div class="card">
+          <h3>Módulo Tabular (Factores de Riesgo — 858 registros)</h3>
+          <div id="tabEvidenceSummary" class="evidence-list"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 18px;">
+        <h3>Gráficas Verificables Generadas</h3>
+        <div class="figures-grid" id="figuresGrid"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      Prototipo IA-Tamizaje Cervical v0.1 • Evidencia Experimental TRL 3 • FastAPI + PyTorch (MobileNetV2) + scikit-learn
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

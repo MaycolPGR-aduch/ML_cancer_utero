@@ -1,0 +1,367 @@
+{
+  "identificacion": {
+    "prototipo": "Prototipo IA-Tamizaje Cervical",
+    "modulo": "cnn_citologia_sipakmed",
+    "version": "v0.1-trl3-cnn",
+    "nivel_madurez": "TRL 3 (Prueba de concepto analitica y experimental en entorno controlado)",
+    "fecha_ejecucion_utc": "2026-11-19T21:30:45.926546+00:00",
+    "random_state": 42,
+    "entorno": {
+      "os": "Windows-10-10.0.26300-SP0",
+      "python": "3.10.0",
+      "dispositivo": "cpu",
+      "cpu_hilos_usados": 8,
+      "pytorch": "2.14.1+cpu"
+    }
+  },
+  "datos": {
+    "fuente": "SIPaKMeD (imagenes celulares recortadas CROPPED + anotaciones *_cyt.dat / *_nuc.dat)",
+    "total_imagenes": 4049,
+    "clases": [
+      "im_Dyskeratotic",
+      "im_Koilocytotic",
+      "im_Metaplastic",
+      "im_Parabasal",
+      "im_Superficial-Intermediate"
+    ],
+    "distribucion_por_clase": {
+      "im_Dyskeratotic": 813,
+      "im_Koilocytotic": 825,
+      "im_Metaplastic": 793,
+      "im_Parabasal": 787,
+      "im_Superficial-Intermediate": 831
+    },
+    "particion_sin_fuga": {
+      "metodo": "StratifiedGroupKFold (n_splits=7) agrupado por (clase, id_lamina)",
+      "laminas_compartidas_entre_splits": 0,
+      "train": {
+        "imagenes": 2819,
+        "laminas_unicas": 691,
+        "por_clase": {
+          "im_Dyskeratotic": 578,
+          "im_Koilocytotic": 527,
+          "im_Metaplastic": 524,
+          "im_Parabasal": 603,
+          "im_Superficial-Intermediate": 587
+        }
+      },
+      "val": {
+        "imagenes": 616,
+        "laminas_unicas": 137,
+        "por_clase": {
+          "im_Dyskeratotic": 102,
+          "im_Koilocytotic": 142,
+          "im_Metaplastic": 147,
+          "im_Parabasal": 106,
+          "im_Superficial-Intermediate": 119
+        }
+      },
+      "test": {
+        "imagenes": 614,
+        "laminas_unicas": 138,
+        "por_clase": {
+          "im_Dyskeratotic": 133,
+          "im_Koilocytotic": 156,
+          "im_Metaplastic": 122,
+          "im_Parabasal": 78,
+          "im_Superficial-Intermediate": 125
+        }
+      }
+    }
+  },
+  "preprocesamiento": {
+    "tamano_entrada": "224x224",
+    "normalizacion": {
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ]
+    },
+    "data_augmentation_solo_train": [
+      "RandomHorizontalFlip(p=0.5)",
+      "RandomVerticalFlip(p=0.5)",
+      "RandomRotation(25 deg)",
+      "ColorJitter(brightness=0.15, contrast=0.15, saturation=0.10)"
+    ],
+    "escalado_anotaciones_dat": "Coordenadas *_cyt.dat y *_nuc.dat escaladas proporcionalmente a 224x224 (ver cnn_sample_annotations_224.png)",
+    "muestras_exportadas": [
+      {
+        "filename": "im_Dyskeratotic_011_01.bmp",
+        "class_name": "im_Dyskeratotic",
+        "orig_size": [
+          106,
+          108
+        ],
+        "cyt_points_scaled": 20,
+        "nuc_points_scaled": 11
+      },
+      {
+        "filename": "im_Koilocytotic_006_01.bmp",
+        "class_name": "im_Koilocytotic",
+        "orig_size": [
+          275,
+          246
+        ],
+        "cyt_points_scaled": 38,
+        "nuc_points_scaled": 24
+      },
+      {
+        "filename": "im_Metaplastic_004_01.bmp",
+        "class_name": "im_Metaplastic",
+        "orig_size": [
+          197,
+          201
+        ],
+        "cyt_points_scaled": 42,
+        "nuc_points_scaled": 23
+      },
+      {
+        "filename": "im_Parabasal_004_01.bmp",
+        "class_name": "im_Parabasal",
+        "orig_size": [
+          216,
+          156
+        ],
+        "cyt_points_scaled": 37,
+        "nuc_points_scaled": 20
+      },
+      {
+        "filename": "im_Superficial-Intermediate_004_01.bmp",
+        "class_name": "im_Superficial-Intermediate",
+        "orig_size": [
+          403,
+          332
+        ],
+        "cyt_points_scaled": 52,
+        "nuc_points_scaled": 16
+      }
+    ]
+  },
+  "entrenamiento": {
+    "arquitectura": "MobileNetV2 (Transfer Learning, pesos ImageNet)",
+    "estrategia": "2 etapas: 2 epocas solo clasificador + 6 epocas fine-tuning (features[10:] + clasificador)",
+    "funcion_perdida": "CrossEntropyLoss ponderada por frecuencia de clase",
+    "optimizador": "AdamW (lr_fase1=1.5e-3, lr_fase2=4e-4 + CosineAnnealingLR, weight_decay=1e-4)",
+    "batch_size": 32,
+    "epocas_totales": 8,
+    "criterio_seleccion": "Mejor Macro-F1 en conjunto de validacion",
+    "mejor_epoca": 8,
+    "mejor_val_macro_f1": 0.9513,
+    "tiempo_entrenamiento_segundos": 1093.2,
+    "historial": [
+      {
+        "epoch": 1,
+        "phase": "head_only",
+        "train_loss": 0.8506,
+        "val_loss": 0.5592,
+        "val_accuracy": 0.8653,
+        "val_macro_f1": 0.8702,
+        "seconds": 148.0
+      },
+      {
+        "epoch": 2,
+        "phase": "head_only",
+        "train_loss": 0.5088,
+        "val_loss": 0.4479,
+        "val_accuracy": 0.8961,
+        "val_macro_f1": 0.8992,
+        "seconds": 120.8
+      },
+      {
+        "epoch": 3,
+        "phase": "finetune_top_blocks",
+        "train_loss": 0.2994,
+        "val_loss": 0.3199,
+        "val_accuracy": 0.8588,
+        "val_macro_f1": 0.8614,
+        "seconds": 161.4
+      },
+      {
+        "epoch": 4,
+        "phase": "finetune_top_blocks",
+        "train_loss": 0.1946,
+        "val_loss": 0.1746,
+        "val_accuracy": 0.9318,
+        "val_macro_f1": 0.9353,
+        "seconds": 136.4
+      },
+      {
+        "epoch": 5,
+        "phase": "finetune_top_blocks",
+        "train_loss": 0.1504,
+        "val_loss": 0.1833,
+        "val_accuracy": 0.9367,
+        "val_macro_f1": 0.9409,
+        "seconds": 126.0
+      },
+      {
+        "epoch": 6,
+        "phase": "finetune_top_blocks",
+        "train_loss": 0.1234,
+        "val_loss": 0.1565,
+        "val_accuracy": 0.9448,
+        "val_macro_f1": 0.9489,
+        "seconds": 132.1
+      },
+      {
+        "epoch": 7,
+        "phase": "finetune_top_blocks",
+        "train_loss": 0.091,
+        "val_loss": 0.1614,
+        "val_accuracy": 0.9448,
+        "val_macro_f1": 0.9494,
+        "seconds": 132.3
+      },
+      {
+        "epoch": 8,
+        "phase": "finetune_top_blocks",
+        "train_loss": 0.0822,
+        "val_loss": 0.156,
+        "val_accuracy": 0.9464,
+        "val_macro_f1": 0.9513,
+        "seconds": 136.1
+      }
+    ]
+  },
+  "metricas_test": {
+    "test_loss": 0.1607,
+    "accuracy": 0.9446,
+    "macro_precision": 0.9482,
+    "macro_recall": 0.9527,
+    "macro_f1": 0.9502,
+    "weighted_f1": 0.9442,
+    "macro_roc_auc_ovr": 0.9948,
+    "macro_pr_auc_ovr": 0.9838,
+    "por_clase": {
+      "im_Dyskeratotic": {
+        "precision": 0.9403,
+        "recall": 0.9474,
+        "f1_score": 0.9438,
+        "roc_auc_ovr": 0.9945,
+        "pr_auc_ovr": 0.9826,
+        "soporte_test": 133
+      },
+      "im_Koilocytotic": {
+        "precision": 0.9122,
+        "recall": 0.8654,
+        "f1_score": 0.8882,
+        "roc_auc_ovr": 0.9835,
+        "pr_auc_ovr": 0.952,
+        "soporte_test": 156
+      },
+      "im_Metaplastic": {
+        "precision": 0.9134,
+        "recall": 0.9508,
+        "f1_score": 0.9317,
+        "roc_auc_ovr": 0.9961,
+        "pr_auc_ovr": 0.9861,
+        "soporte_test": 122
+      },
+      "im_Parabasal": {
+        "precision": 0.975,
+        "recall": 1.0,
+        "f1_score": 0.9873,
+        "roc_auc_ovr": 0.9998,
+        "pr_auc_ovr": 0.9985,
+        "soporte_test": 78
+      },
+      "im_Superficial-Intermediate": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "roc_auc_ovr": 1.0,
+        "pr_auc_ovr": 1.0,
+        "soporte_test": 125
+      }
+    },
+    "matriz_confusion_5x5": [
+      [
+        126,
+        7,
+        0,
+        0,
+        0
+      ],
+      [
+        8,
+        135,
+        11,
+        2,
+        0
+      ],
+      [
+        0,
+        6,
+        116,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        78,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        125
+      ]
+    ],
+    "tamizaje_clinico_binario": {
+      "definicion_anormal": [
+        "im_Dyskeratotic",
+        "im_Koilocytotic"
+      ],
+      "definicion_normal_benigna": [
+        "im_Metaplastic",
+        "im_Parabasal",
+        "im_Superficial-Intermediate"
+      ],
+      "umbral_probabilidad_anormal": 0.5,
+      "sensibilidad_recall": 0.9516,
+      "especificidad": 0.9846,
+      "precision": 0.9821,
+      "f1_score": 0.9666,
+      "roc_auc": 0.9964,
+      "pr_auc": 0.996,
+      "matriz_confusion_binaria": {
+        "tn": 320,
+        "fp": 5,
+        "fn": 14,
+        "tp": 275
+      }
+    }
+  },
+  "prueba_inferencia": {
+    "imagen_prueba": "011_01.bmp",
+    "clase_real": "im_Dyskeratotic",
+    "clase_predicha": "im_Dyskeratotic",
+    "probabilidades_por_clase": {
+      "im_Dyskeratotic": 1.0,
+      "im_Koilocytotic": 0.0,
+      "im_Metaplastic": 0.0,
+      "im_Parabasal": 0.0,
+      "im_Superficial-Intermediate": 0.0
+    },
+    "probabilidad_anormal_agregada": 1.0,
+    "latencia_promedio_ms_30_runs": 13.23
+  },
+  "artefactos_generados": {
+    "modelo_pytorch": "models/cnn_sipakmed_trl3_v01.pt",
+    "matriz_confusion_png": "outputs/cnn_confusion_matrix.png",
+    "curvas_roc_pr_png": "outputs/cnn_roc_pr_curves.png",
+    "historial_entrenamiento_png": "outputs/cnn_training_history.png",
+    "anotaciones_dat_224_png": "outputs/cnn_sample_annotations_224.png",
+    "gradcam_ejemplos_png": "outputs/cnn_sample_gradcam.png"
+  }
+}

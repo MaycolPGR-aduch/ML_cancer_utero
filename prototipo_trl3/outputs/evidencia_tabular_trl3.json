@@ -1,0 +1,287 @@
+{
+  "identificacion": {
+    "prototipo": "Prototipo IA-Tamizaje Cervical",
+    "modulo": "tabular_factores_riesgo",
+    "version": "v0.1-trl3-tabular",
+    "nivel_madurez": "TRL 3 (Prueba de concepto analitica y experimental en entorno controlado)",
+    "fecha_ejecucion_utc": "2026-11-19T21:10:27.598863+00:00",
+    "random_state": 42,
+    "entorno": {
+      "os": "Windows-10-10.0.26300-SP0",
+      "python": "3.10.0",
+      "cpu": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+      "scikit_learn": "1.7.2",
+      "pandas": "2.2.3",
+      "numpy": "2.2.2"
+    }
+  },
+  "datos": {
+    "fuente": "kag_risk_factors_cervical_cancer.csv (Hospital Universitario de Caracas / Kaggle)",
+    "dimensiones_iniciales": {
+      "filas": 858,
+      "columnas": 36
+    },
+    "dimensiones_entrada_modelo": {
+      "filas": 858,
+      "variables_entrada": 26
+    },
+    "variable_objetivo": "Biopsy",
+    "desenlaces_registrados": {
+      "Biopsy": {
+        "positivos": 55,
+        "negativos": 803,
+        "prevalencia_pct": 6.41
+      },
+      "Dx:Cancer": {
+        "positivos": 18,
+        "negativos": 840,
+        "prevalencia_pct": 2.1
+      },
+      "Hinselmann": {
+        "positivos": 35,
+        "negativos": 823,
+        "prevalencia_pct": 4.08
+      },
+      "Schiller": {
+        "positivos": 74,
+        "negativos": 784,
+        "prevalencia_pct": 8.62
+      },
+      "Citology": {
+        "positivos": 44,
+        "negativos": 814,
+        "prevalencia_pct": 5.13
+      }
+    },
+    "faltantes_detectados_por_columna": {
+      "Number of sexual partners": 26,
+      "First sexual intercourse": 7,
+      "Num of pregnancies": 56,
+      "Smokes": 13,
+      "Smokes (years)": 13,
+      "Smokes (packs/year)": 13,
+      "Hormonal Contraceptives": 108,
+      "Hormonal Contraceptives (years)": 108,
+      "IUD": 117,
+      "IUD (years)": 117,
+      "STDs": 105,
+      "STDs (number)": 105,
+      "STDs:condylomatosis": 105,
+      "STDs:cervical condylomatosis": 105,
+      "STDs:vaginal condylomatosis": 105,
+      "STDs:vulvo-perineal condylomatosis": 105,
+      "STDs:syphilis": 105,
+      "STDs:pelvic inflammatory disease": 105,
+      "STDs:genital herpes": 105,
+      "STDs:molluscum contagiosum": 105,
+      "STDs:AIDS": 105,
+      "STDs:HIV": 105,
+      "STDs:Hepatitis B": 105,
+      "STDs:HPV": 105,
+      "STDs: Time since first diagnosis": 787,
+      "STDs: Time since last diagnosis": 787
+    },
+    "variables_excluidas_leakage": [
+      "Hinselmann",
+      "Schiller",
+      "Citology",
+      "Biopsy",
+      "Dx:Cancer",
+      "Dx:CIN",
+      "Dx:HPV",
+      "Dx"
+    ],
+    "variables_excluidas_alta_ausencia_gt_50pct": [
+      "STDs: Time since first diagnosis",
+      "STDs: Time since last diagnosis"
+    ],
+    "variables_constantes_observadas": [
+      "STDs:cervical condylomatosis",
+      "STDs:AIDS"
+    ],
+    "variables_entrada_utilizadas": [
+      "Age",
+      "Number of sexual partners",
+      "First sexual intercourse",
+      "Num of pregnancies",
+      "Smokes",
+      "Smokes (years)",
+      "Smokes (packs/year)",
+      "Hormonal Contraceptives",
+      "Hormonal Contraceptives (years)",
+      "IUD",
+      "IUD (years)",
+      "STDs",
+      "STDs (number)",
+      "STDs:condylomatosis",
+      "STDs:cervical condylomatosis",
+      "STDs:vaginal condylomatosis",
+      "STDs:vulvo-perineal condylomatosis",
+      "STDs:syphilis",
+      "STDs:pelvic inflammatory disease",
+      "STDs:genital herpes",
+      "STDs:molluscum contagiosum",
+      "STDs:AIDS",
+      "STDs:HIV",
+      "STDs:Hepatitis B",
+      "STDs:HPV",
+      "STDs: Number of diagnosis"
+    ]
+  },
+  "metodologia": {
+    "estrategia_validacion": "Validacion cruzada estratificada (StratifiedKFold, k=5, shuffle=True, random_state=42)",
+    "preprocesamiento_en_pipeline": [
+      "Reemplazo de '?' por NaN y conversion numerica",
+      "SimpleImputer(strategy='median') ajustado dentro de cada fold (sin fuga)",
+      "StandardScaler() ajustado dentro de cada fold",
+      "Manejo de desbalance mediante class_weight='balanced'"
+    ],
+    "modelo_seleccionado": "RandomForest (balanced)",
+    "umbral_decision_tamizaje": 0.44,
+    "criterio_seleccion": "Mayor ROC-AUC medio en CV 5-fold (desempate por PR-AUC)"
+  },
+  "comparacion_modelos_baseline": {
+    "LogisticRegression (balanced)": {
+      "cv_5fold_mean": {
+        "roc_auc": 0.5467,
+        "roc_auc_std": 0.0738,
+        "pr_auc": 0.1135,
+        "pr_auc_std": 0.0448,
+        "recall_thr_0_5": 0.3818,
+        "precision_thr_0_5": 0.0942,
+        "f1_thr_0_5": 0.1507
+      },
+      "oof_global": {
+        "roc_auc": 0.5415,
+        "pr_auc": 0.0903,
+        "umbral_optimizado_tamizaje": {
+          "threshold": 0.64,
+          "f1": 0.1831,
+          "recall": 0.2364,
+          "precision": 0.1494
+        }
+      }
+    },
+    "RandomForest (balanced)": {
+      "cv_5fold_mean": {
+        "roc_auc": 0.6437,
+        "roc_auc_std": 0.1025,
+        "pr_auc": 0.1695,
+        "pr_auc_std": 0.0966,
+        "recall_thr_0_5": 0.1455,
+        "precision_thr_0_5": 0.1681,
+        "f1_thr_0_5": 0.1543
+      },
+      "oof_global": {
+        "roc_auc": 0.6241,
+        "pr_auc": 0.1079,
+        "umbral_optimizado_tamizaje": {
+          "threshold": 0.44,
+          "f1": 0.1838,
+          "recall": 0.3091,
+          "precision": 0.1308
+        }
+      }
+    },
+    "ExtraTrees (balanced)": {
+      "cv_5fold_mean": {
+        "roc_auc": 0.6261,
+        "roc_auc_std": 0.0859,
+        "pr_auc": 0.171,
+        "pr_auc_std": 0.0844,
+        "recall_thr_0_5": 0.2909,
+        "precision_thr_0_5": 0.149,
+        "f1_thr_0_5": 0.1951
+      },
+      "oof_global": {
+        "roc_auc": 0.5917,
+        "pr_auc": 0.108,
+        "umbral_optimizado_tamizaje": {
+          "threshold": 0.49,
+          "f1": 0.2069,
+          "recall": 0.3273,
+          "precision": 0.1513
+        }
+      }
+    }
+  },
+  "metricas_modelo_seleccionado": {
+    "cv_5fold": {
+      "roc_auc": 0.6437,
+      "roc_auc_std": 0.1025,
+      "pr_auc": 0.1695,
+      "pr_auc_std": 0.0966,
+      "recall_thr_0_5": 0.1455,
+      "precision_thr_0_5": 0.1681,
+      "f1_thr_0_5": 0.1543
+    },
+    "oof_con_umbral_tamizaje": {
+      "umbral": 0.44,
+      "roc_auc": 0.6241,
+      "pr_auc": 0.1079,
+      "recall_sensibilidad": 0.3091,
+      "especificidad": 0.8593,
+      "precision": 0.1308,
+      "f1_score": 0.1838,
+      "matriz_confusion": {
+        "tn": 690,
+        "fp": 113,
+        "fn": 38,
+        "tp": 17
+      }
+    },
+    "top_10_variables_importantes": [
+      {
+        "variable": "Hormonal Contraceptives (years)",
+        "importancia_relativa": 0.1976
+      },
+      {
+        "variable": "Age",
+        "importancia_relativa": 0.1417
+      },
+      {
+        "variable": "First sexual intercourse",
+        "importancia_relativa": 0.1257
+      },
+      {
+        "variable": "Num of pregnancies",
+        "importancia_relativa": 0.1022
+      },
+      {
+        "variable": "Number of sexual partners",
+        "importancia_relativa": 0.0566
+      },
+      {
+        "variable": "Smokes (packs/year)",
+        "importancia_relativa": 0.056
+      },
+      {
+        "variable": "STDs (number)",
+        "importancia_relativa": 0.0554
+      },
+      {
+        "variable": "Smokes (years)",
+        "importancia_relativa": 0.0456
+      },
+      {
+        "variable": "IUD (years)",
+        "importancia_relativa": 0.0385
+      },
+      {
+        "variable": "STDs",
+        "importancia_relativa": 0.0335
+      }
+    ]
+  },
+  "prueba_inferencia": {
+    "caso_prueba": "registro_indice_0",
+    "probabilidad_riesgo_biopsia": 0.3678,
+    "clasificacion_umbral_tamizaje": 0,
+    "latencia_promedio_ms_50_runs": 35.341
+  },
+  "artefactos_generados": {
+    "modelo": "models/tabular_trl3_v01.joblib",
+    "matriz_confusion_png": "outputs/tabular_confusion_matrix.png",
+    "curvas_roc_pr_png": "outputs/tabular_roc_pr_curves.png"
+  }
+}

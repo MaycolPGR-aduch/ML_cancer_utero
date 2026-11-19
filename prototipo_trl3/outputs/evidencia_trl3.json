@@ -1,0 +1,663 @@
+{
+  "prototipo": "Prototipo IA-Tamizaje Cervical v0.1 (TRL 3)",
+  "nivel_madurez": "TRL 3 - Prueba de concepto analitica y experimental en entorno controlado",
+  "fecha_consolidacion_utc": "2026-11-19T21:30:45.942697+00:00",
+  "modulos_disponibles": [
+    "cnn_citologia_sipakmed",
+    "tabular_factores_riesgo"
+  ],
+  "modulo_cnn": {
+    "identificacion": {
+      "prototipo": "Prototipo IA-Tamizaje Cervical",
+      "modulo": "cnn_citologia_sipakmed",
+      "version": "v0.1-trl3-cnn",
+      "nivel_madurez": "TRL 3 (Prueba de concepto analitica y experimental en entorno controlado)",
+      "fecha_ejecucion_utc": "2026-11-19T21:30:45.926546+00:00",
+      "random_state": 42,
+      "entorno": {
+        "os": "Windows-10-10.0.26300-SP0",
+        "python": "3.10.0",
+        "dispositivo": "cpu",
+        "cpu_hilos_usados": 8,
+        "pytorch": "2.14.1+cpu"
+      }
+    },
+    "datos": {
+      "fuente": "SIPaKMeD (imagenes celulares recortadas CROPPED + anotaciones *_cyt.dat / *_nuc.dat)",
+      "total_imagenes": 4049,
+      "clases": [
+        "im_Dyskeratotic",
+        "im_Koilocytotic",
+        "im_Metaplastic",
+        "im_Parabasal",
+        "im_Superficial-Intermediate"
+      ],
+      "distribucion_por_clase": {
+        "im_Dyskeratotic": 813,
+        "im_Koilocytotic": 825,
+        "im_Metaplastic": 793,
+        "im_Parabasal": 787,
+        "im_Superficial-Intermediate": 831
+      },
+      "particion_sin_fuga": {
+        "metodo": "StratifiedGroupKFold (n_splits=7) agrupado por (clase, id_lamina)",
+        "laminas_compartidas_entre_splits": 0,
+        "train": {
+          "imagenes": 2819,
+          "laminas_unicas": 691,
+          "por_clase": {
+            "im_Dyskeratotic": 578,
+            "im_Koilocytotic": 527,
+            "im_Metaplastic": 524,
+            "im_Parabasal": 603,
+            "im_Superficial-Intermediate": 587
+          }
+        },
+        "val": {
+          "imagenes": 616,
+          "laminas_unicas": 137,
+          "por_clase": {
+            "im_Dyskeratotic": 102,
+            "im_Koilocytotic": 142,
+            "im_Metaplastic": 147,
+            "im_Parabasal": 106,
+            "im_Superficial-Intermediate": 119
+          }
+        },
+        "test": {
+          "imagenes": 614,
+          "laminas_unicas": 138,
+          "por_clase": {
+            "im_Dyskeratotic": 133,
+            "im_Koilocytotic": 156,
+            "im_Metaplastic": 122,
+            "im_Parabasal": 78,
+            "im_Superficial-Intermediate": 125
+          }
+        }
+      }
+    },
+    "preprocesamiento": {
+      "tamano_entrada": "224x224",
+      "normalizacion": {
+        "mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "std": [
+          0.229,
+          0.224,
+          0.225
+        ]
+      },
+      "data_augmentation_solo_train": [
+        "RandomHorizontalFlip(p=0.5)",
+        "RandomVerticalFlip(p=0.5)",
+        "RandomRotation(25 deg)",
+        "ColorJitter(brightness=0.15, contrast=0.15, saturation=0.10)"
+      ],
+      "escalado_anotaciones_dat": "Coordenadas *_cyt.dat y *_nuc.dat escaladas proporcionalmente a 224x224 (ver cnn_sample_annotations_224.png)",
+      "muestras_exportadas": [
+        {
+          "filename": "im_Dyskeratotic_011_01.bmp",
+          "class_name": "im_Dyskeratotic",
+          "orig_size": [
+            106,
+            108
+          ],
+          "cyt_points_scaled": 20,
+          "nuc_points_scaled": 11
+        },
+        {
+          "filename": "im_Koilocytotic_006_01.bmp",
+          "class_name": "im_Koilocytotic",
+          "orig_size": [
+            275,
+            246
+          ],
+          "cyt_points_scaled": 38,
+          "nuc_points_scaled": 24
+        },
+        {
+          "filename": "im_Metaplastic_004_01.bmp",
+          "class_name": "im_Metaplastic",
+          "orig_size": [
+            197,
+            201
+          ],
+          "cyt_points_scaled": 42,
+          "nuc_points_scaled": 23
+        },
+        {
+          "filename": "im_Parabasal_004_01.bmp",
+          "class_name": "im_Parabasal",
+          "orig_size": [
+            216,
+            156
+          ],
+          "cyt_points_scaled": 37,
+          "nuc_points_scaled": 20
+        },
+        {
+          "filename": "im_Superficial-Intermediate_004_01.bmp",
+          "class_name": "im_Superficial-Intermediate",
+          "orig_size": [
+            403,
+            332
+          ],
+          "cyt_points_scaled": 52,
+          "nuc_points_scaled": 16
+        }
+      ]
+    },
+    "entrenamiento": {
+      "arquitectura": "MobileNetV2 (Transfer Learning, pesos ImageNet)",
+      "estrategia": "2 etapas: 2 epocas solo clasificador + 6 epocas fine-tuning (features[10:] + clasificador)",
+      "funcion_perdida": "CrossEntropyLoss ponderada por frecuencia de clase",
+      "optimizador": "AdamW (lr_fase1=1.5e-3, lr_fase2=4e-4 + CosineAnnealingLR, weight_decay=1e-4)",
+      "batch_size": 32,
+      "epocas_totales": 8,
+      "criterio_seleccion": "Mejor Macro-F1 en conjunto de validacion",
+      "mejor_epoca": 8,
+      "mejor_val_macro_f1": 0.9513,
+      "tiempo_entrenamiento_segundos": 1093.2,
+      "historial": [
+        {
+          "epoch": 1,
+          "phase": "head_only",
+          "train_loss": 0.8506,
+          "val_loss": 0.5592,
+          "val_accuracy": 0.8653,
+          "val_macro_f1": 0.8702,
+          "seconds": 148.0
+        },
+        {
+          "epoch": 2,
+          "phase": "head_only",
+          "train_loss": 0.5088,
+          "val_loss": 0.4479,
+          "val_accuracy": 0.8961,
+          "val_macro_f1": 0.8992,
+          "seconds": 120.8
+        },
+        {
+          "epoch": 3,
+          "phase": "finetune_top_blocks",
+          "train_loss": 0.2994,
+          "val_loss": 0.3199,
+          "val_accuracy": 0.8588,
+          "val_macro_f1": 0.8614,
+          "seconds": 161.4
+        },
+        {
+          "epoch": 4,
+          "phase": "finetune_top_blocks",
+          "train_loss": 0.1946,
+          "val_loss": 0.1746,
+          "val_accuracy": 0.9318,
+          "val_macro_f1": 0.9353,
+          "seconds": 136.4
+        },
+        {
+          "epoch": 5,
+          "phase": "finetune_top_blocks",
+          "train_loss": 0.1504,
+          "val_loss": 0.1833,
+          "val_accuracy": 0.9367,
+          "val_macro_f1": 0.9409,
+          "seconds": 126.0
+        },
+        {
+          "epoch": 6,
+          "phase": "finetune_top_blocks",
+          "train_loss": 0.1234,
+          "val_loss": 0.1565,
+          "val_accuracy": 0.9448,
+          "val_macro_f1": 0.9489,
+          "seconds": 132.1
+        },
+        {
+          "epoch": 7,
+          "phase": "finetune_top_blocks",
+          "train_loss": 0.091,
+          "val_loss": 0.1614,
+          "val_accuracy": 0.9448,
+          "val_macro_f1": 0.9494,
+          "seconds": 132.3
+        },
+        {
+          "epoch": 8,
+          "phase": "finetune_top_blocks",
+          "train_loss": 0.0822,
+          "val_loss": 0.156,
+          "val_accuracy": 0.9464,
+          "val_macro_f1": 0.9513,
+          "seconds": 136.1
+        }
+      ]
+    },
+    "metricas_test": {
+      "test_loss": 0.1607,
+      "accuracy": 0.9446,
+      "macro_precision": 0.9482,
+      "macro_recall": 0.9527,
+      "macro_f1": 0.9502,
+      "weighted_f1": 0.9442,
+      "macro_roc_auc_ovr": 0.9948,
+      "macro_pr_auc_ovr": 0.9838,
+      "por_clase": {
+        "im_Dyskeratotic": {
+          "precision": 0.9403,
+          "recall": 0.9474,
+          "f1_score": 0.9438,
+          "roc_auc_ovr": 0.9945,
+          "pr_auc_ovr": 0.9826,
+          "soporte_test": 133
+        },
+        "im_Koilocytotic": {
+          "precision": 0.9122,
+          "recall": 0.8654,
+          "f1_score": 0.8882,
+          "roc_auc_ovr": 0.9835,
+          "pr_auc_ovr": 0.952,
+          "soporte_test": 156
+        },
+        "im_Metaplastic": {
+          "precision": 0.9134,
+          "recall": 0.9508,
+          "f1_score": 0.9317,
+          "roc_auc_ovr": 0.9961,
+          "pr_auc_ovr": 0.9861,
+          "soporte_test": 122
+        },
+        "im_Parabasal": {
+          "precision": 0.975,
+          "recall": 1.0,
+          "f1_score": 0.9873,
+          "roc_auc_ovr": 0.9998,
+          "pr_auc_ovr": 0.9985,
+          "soporte_test": 78
+        },
+        "im_Superficial-Intermediate": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1_score": 1.0,
+          "roc_auc_ovr": 1.0,
+          "pr_auc_ovr": 1.0,
+          "soporte_test": 125
+        }
+      },
+      "matriz_confusion_5x5": [
+        [
+          126,
+          7,
+          0,
+          0,
+          0
+        ],
+        [
+          8,
+          135,
+          11,
+          2,
+          0
+        ],
+        [
+          0,
+          6,
+          116,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          78,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          125
+        ]
+      ],
+      "tamizaje_clinico_binario": {
+        "definicion_anormal": [
+          "im_Dyskeratotic",
+          "im_Koilocytotic"
+        ],
+        "definicion_normal_benigna": [
+          "im_Metaplastic",
+          "im_Parabasal",
+          "im_Superficial-Intermediate"
+        ],
+        "umbral_probabilidad_anormal": 0.5,
+        "sensibilidad_recall": 0.9516,
+        "especificidad": 0.9846,
+        "precision": 0.9821,
+        "f1_score": 0.9666,
+        "roc_auc": 0.9964,
+        "pr_auc": 0.996,
+        "matriz_confusion_binaria": {
+          "tn": 320,
+          "fp": 5,
+          "fn": 14,
+          "tp": 275
+        }
+      }
+    },
+    "prueba_inferencia": {
+      "imagen_prueba": "011_01.bmp",
+      "clase_real": "im_Dyskeratotic",
+      "clase_predicha": "im_Dyskeratotic",
+      "probabilidades_por_clase": {
+        "im_Dyskeratotic": 1.0,
+        "im_Koilocytotic": 0.0,
+        "im_Metaplastic": 0.0,
+        "im_Parabasal": 0.0,
+        "im_Superficial-Intermediate": 0.0
+      },
+      "probabilidad_anormal_agregada": 1.0,
+      "latencia_promedio_ms_30_runs": 13.23
+    },
+    "artefactos_generados": {
+      "modelo_pytorch": "models/cnn_sipakmed_trl3_v01.pt",
+      "matriz_confusion_png": "outputs/cnn_confusion_matrix.png",
+      "curvas_roc_pr_png": "outputs/cnn_roc_pr_curves.png",
+      "historial_entrenamiento_png": "outputs/cnn_training_history.png",
+      "anotaciones_dat_224_png": "outputs/cnn_sample_annotations_224.png",
+      "gradcam_ejemplos_png": "outputs/cnn_sample_gradcam.png"
+    }
+  },
+  "modulo_tabular": {
+    "identificacion": {
+      "prototipo": "Prototipo IA-Tamizaje Cervical",
+      "modulo": "tabular_factores_riesgo",
+      "version": "v0.1-trl3-tabular",
+      "nivel_madurez": "TRL 3 (Prueba de concepto analitica y experimental en entorno controlado)",
+      "fecha_ejecucion_utc": "2026-11-19T21:10:27.598863+00:00",
+      "random_state": 42,
+      "entorno": {
+        "os": "Windows-10-10.0.26300-SP0",
+        "python": "3.10.0",
+        "cpu": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+        "scikit_learn": "1.7.2",
+        "pandas": "2.2.3",
+        "numpy": "2.2.2"
+      }
+    },
+    "datos": {
+      "fuente": "kag_risk_factors_cervical_cancer.csv (Hospital Universitario de Caracas / Kaggle)",
+      "dimensiones_iniciales": {
+        "filas": 858,
+        "columnas": 36
+      },
+      "dimensiones_entrada_modelo": {
+        "filas": 858,
+        "variables_entrada": 26
+      },
+      "variable_objetivo": "Biopsy",
+      "desenlaces_registrados": {
+        "Biopsy": {
+          "positivos": 55,
+          "negativos": 803,
+          "prevalencia_pct": 6.41
+        },
+        "Dx:Cancer": {
+          "positivos": 18,
+          "negativos": 840,
+          "prevalencia_pct": 2.1
+        },
+        "Hinselmann": {
+          "positivos": 35,
+          "negativos": 823,
+          "prevalencia_pct": 4.08
+        },
+        "Schiller": {
+          "positivos": 74,
+          "negativos": 784,
+          "prevalencia_pct": 8.62
+        },
+        "Citology": {
+          "positivos": 44,
+          "negativos": 814,
+          "prevalencia_pct": 5.13
+        }
+      },
+      "faltantes_detectados_por_columna": {
+        "Number of sexual partners": 26,
+        "First sexual intercourse": 7,
+        "Num of pregnancies": 56,
+        "Smokes": 13,
+        "Smokes (years)": 13,
+        "Smokes (packs/year)": 13,
+        "Hormonal Contraceptives": 108,
+        "Hormonal Contraceptives (years)": 108,
+        "IUD": 117,
+        "IUD (years)": 117,
+        "STDs": 105,
+        "STDs (number)": 105,
+        "STDs:condylomatosis": 105,
+        "STDs:cervical condylomatosis": 105,
+        "STDs:vaginal condylomatosis": 105,
+        "STDs:vulvo-perineal condylomatosis": 105,
+        "STDs:syphilis": 105,
+        "STDs:pelvic inflammatory disease": 105,
+        "STDs:genital herpes": 105,
+        "STDs:molluscum contagiosum": 105,
+        "STDs:AIDS": 105,
+        "STDs:HIV": 105,
+        "STDs:Hepatitis B": 105,
+        "STDs:HPV": 105,
+        "STDs: Time since first diagnosis": 787,
+        "STDs: Time since last diagnosis": 787
+      },
+      "variables_excluidas_leakage": [
+        "Hinselmann",
+        "Schiller",
+        "Citology",
+        "Biopsy",
+        "Dx:Cancer",
+        "Dx:CIN",
+        "Dx:HPV",
+        "Dx"
+      ],
+      "variables_excluidas_alta_ausencia_gt_50pct": [
+        "STDs: Time since first diagnosis",
+        "STDs: Time since last diagnosis"
+      ],
+      "variables_constantes_observadas": [
+        "STDs:cervical condylomatosis",
+        "STDs:AIDS"
+      ],
+      "variables_entrada_utilizadas": [
+        "Age",
+        "Number of sexual partners",
+        "First sexual intercourse",
+        "Num of pregnancies",
+        "Smokes",
+        "Smokes (years)",
+        "Smokes (packs/year)",
+        "Hormonal Contraceptives",
+        "Hormonal Contraceptives (years)",
+        "IUD",
+        "IUD (years)",
+        "STDs",
+        "STDs (number)",
+        "STDs:condylomatosis",
+        "STDs:cervical condylomatosis",
+        "STDs:vaginal condylomatosis",
+        "STDs:vulvo-perineal condylomatosis",
+        "STDs:syphilis",
+        "STDs:pelvic inflammatory disease",
+        "STDs:genital herpes",
+        "STDs:molluscum contagiosum",
+        "STDs:AIDS",
+        "STDs:HIV",
+        "STDs:Hepatitis B",
+        "STDs:HPV",
+        "STDs: Number of diagnosis"
+      ]
+    },
+    "metodologia": {
+      "estrategia_validacion": "Validacion cruzada estratificada (StratifiedKFold, k=5, shuffle=True, random_state=42)",
+      "preprocesamiento_en_pipeline": [
+        "Reemplazo de '?' por NaN y conversion numerica",
+        "SimpleImputer(strategy='median') ajustado dentro de cada fold (sin fuga)",
+        "StandardScaler() ajustado dentro de cada fold",
+        "Manejo de desbalance mediante class_weight='balanced'"
+      ],
+      "modelo_seleccionado": "RandomForest (balanced)",
+      "umbral_decision_tamizaje": 0.44,
+      "criterio_seleccion": "Mayor ROC-AUC medio en CV 5-fold (desempate por PR-AUC)"
+    },
+    "comparacion_modelos_baseline": {
+      "LogisticRegression (balanced)": {
+        "cv_5fold_mean": {
+          "roc_auc": 0.5467,
+          "roc_auc_std": 0.0738,
+          "pr_auc": 0.1135,
+          "pr_auc_std": 0.0448,
+          "recall_thr_0_5": 0.3818,
+          "precision_thr_0_5": 0.0942,
+          "f1_thr_0_5": 0.1507
+        },
+        "oof_global": {
+          "roc_auc": 0.5415,
+          "pr_auc": 0.0903,
+          "umbral_optimizado_tamizaje": {
+            "threshold": 0.64,
+            "f1": 0.1831,
+            "recall": 0.2364,
+            "precision": 0.1494
+          }
+        }
+      },
+      "RandomForest (balanced)": {
+        "cv_5fold_mean": {
+          "roc_auc": 0.6437,
+          "roc_auc_std": 0.1025,
+          "pr_auc": 0.1695,
+          "pr_auc_std": 0.0966,
+          "recall_thr_0_5": 0.1455,
+          "precision_thr_0_5": 0.1681,
+          "f1_thr_0_5": 0.1543
+        },
+        "oof_global": {
+          "roc_auc": 0.6241,
+          "pr_auc": 0.1079,
+          "umbral_optimizado_tamizaje": {
+            "threshold": 0.44,
+            "f1": 0.1838,
+            "recall": 0.3091,
+            "precision": 0.1308
+          }
+        }
+      },
+      "ExtraTrees (balanced)": {
+        "cv_5fold_mean": {
+          "roc_auc": 0.6261,
+          "roc_auc_std": 0.0859,
+          "pr_auc": 0.171,
+          "pr_auc_std": 0.0844,
+          "recall_thr_0_5": 0.2909,
+          "precision_thr_0_5": 0.149,
+          "f1_thr_0_5": 0.1951
+        },
+        "oof_global": {
+          "roc_auc": 0.5917,
+          "pr_auc": 0.108,
+          "umbral_optimizado_tamizaje": {
+            "threshold": 0.49,
+            "f1": 0.2069,
+            "recall": 0.3273,
+            "precision": 0.1513
+          }
+        }
+      }
+    },
+    "metricas_modelo_seleccionado": {
+      "cv_5fold": {
+        "roc_auc": 0.6437,
+        "roc_auc_std": 0.1025,
+        "pr_auc": 0.1695,
+        "pr_auc_std": 0.0966,
+        "recall_thr_0_5": 0.1455,
+        "precision_thr_0_5": 0.1681,
+        "f1_thr_0_5": 0.1543
+      },
+      "oof_con_umbral_tamizaje": {
+        "umbral": 0.44,
+        "roc_auc": 0.6241,
+        "pr_auc": 0.1079,
+        "recall_sensibilidad": 0.3091,
+        "especificidad": 0.8593,
+        "precision": 0.1308,
+        "f1_score": 0.1838,
+        "matriz_confusion": {
+          "tn": 690,
+          "fp": 113,
+          "fn": 38,
+          "tp": 17
+        }
+      },
+      "top_10_variables_importantes": [
+        {
+          "variable": "Hormonal Contraceptives (years)",
+          "importancia_relativa": 0.1976
+        },
+        {
+          "variable": "Age",
+          "importancia_relativa": 0.1417
+        },
+        {
+          "variable": "First sexual intercourse",
+          "importancia_relativa": 0.1257
+        },
+        {
+          "variable": "Num of pregnancies",
+          "importancia_relativa": 0.1022
+        },
+        {
+          "variable": "Number of sexual partners",
+          "importancia_relativa": 0.0566
+        },
+        {
+          "variable": "Smokes (packs/year)",
+          "importancia_relativa": 0.056
+        },
+        {
+          "variable": "STDs (number)",
+          "importancia_relativa": 0.0554
+        },
+        {
+          "variable": "Smokes (years)",
+          "importancia_relativa": 0.0456
+        },
+        {
+          "variable": "IUD (years)",
+          "importancia_relativa": 0.0385
+        },
+        {
+          "variable": "STDs",
+          "importancia_relativa": 0.0335
+        }
+      ]
+    },
+    "prueba_inferencia": {
+      "caso_prueba": "registro_indice_0",
+      "probabilidad_riesgo_biopsia": 0.3678,
+      "clasificacion_umbral_tamizaje": 0,
+      "latencia_promedio_ms_50_runs": 35.341
+    },
+    "artefactos_generados": {
+      "modelo": "models/tabular_trl3_v01.joblib",
+      "matriz_confusion_png": "outputs/tabular_confusion_matrix.png",
+      "curvas_roc_pr_png": "outputs/tabular_roc_pr_curves.png"
+    }
+  }
+}
