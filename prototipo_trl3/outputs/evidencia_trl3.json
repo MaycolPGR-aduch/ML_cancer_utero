@@ -1,10 +1,11 @@
 {
   "prototipo": "Prototipo IA-Tamizaje Cervical v0.1 (TRL 3)",
   "nivel_madurez": "TRL 3 - Prueba de concepto analitica y experimental en entorno controlado",
-  "fecha_consolidacion_utc": "2026-11-19T21:30:45.942697+00:00",
+  "fecha_consolidacion_utc": "2026-11-19T22:09:50.683316+00:00",
   "modulos_disponibles": [
     "cnn_citologia_sipakmed",
-    "tabular_factores_riesgo"
+    "tabular_factores_riesgo",
+    "ood_validez_dominio_citologico"
   ],
   "modulo_cnn": {
     "identificacion": {
@@ -658,6 +659,124 @@
       "modelo": "models/tabular_trl3_v01.joblib",
       "matriz_confusion_png": "outputs/tabular_confusion_matrix.png",
       "curvas_roc_pr_png": "outputs/tabular_roc_pr_curves.png"
+    }
+  },
+  "modulo_ood": {
+    "identificacion": {
+      "prototipo": "Prototipo IA-Tamizaje Cervical",
+      "modulo": "ood_validez_dominio_citologico",
+      "version": "v0.1-trl3-ood",
+      "fecha_ejecucion_utc": "2026-11-19T22:09:50.660523+00:00",
+      "random_state": 42,
+      "entorno": {
+        "os": "Windows-10-10.0.26300-SP0",
+        "python": "3.10.0",
+        "pytorch": "2.14.1+cpu"
+      }
+    },
+    "datos": {
+      "positivos_in_domain": "SIPaKMeD CROPPED (misma particion sin fuga por lamina que modulo CNN)",
+      "negativos_out_of_domain": "archivebase2 (Multi Cancer Dataset) — 7 organos NO cervicales (21 subclases); Cervical Cancer de archivebase2 excluido explicitamente para evitar data leakage",
+      "organos_negativos_usados": [
+        "ALL",
+        "Brain Cancer",
+        "Breast Cancer",
+        "Kidney Cancer",
+        "Lung and Colon Cancer",
+        "Lymphoma",
+        "Oral Cancer"
+      ],
+      "conteos": {
+        "train_cervical": 2819,
+        "train_no_cervical": 2520,
+        "val_cervical": 616,
+        "val_no_cervical": 420,
+        "test_cervical": 614,
+        "test_no_cervical": 630,
+        "test_sinteticas_no_medicas": 60
+      },
+      "muestras_ood_exportadas": [
+        {
+          "filename": "ood_brain_glioma_brain_glioma_1965.jpg",
+          "organ": "Brain Cancer",
+          "subclass": "brain_glioma"
+        },
+        {
+          "filename": "ood_kidney_normal_kidney_normal_1767.jpg",
+          "organ": "Kidney Cancer",
+          "subclass": "kidney_normal"
+        },
+        {
+          "filename": "ood_colon_aca_colon_aca_2341.jpg",
+          "organ": "Lung and Colon Cancer",
+          "subclass": "colon_aca"
+        }
+      ]
+    },
+    "arquitectura": {
+      "extractor_compartido": "MobileNetV2 (mismo pase forward del clasificador CNN, 1,280 dim, cero pase CNN adicional)",
+      "doble_compuerta": [
+        "Clasificador calibrado StandardScaler + LogisticRegression(C=0.5, balanced) >= 0.5",
+        "Similitud coseno maxima a los 5 centroides citologicos de entrenamiento >= 0.45"
+      ]
+    },
+    "metricas_test": {
+      "aceptacion_citologia_valida_recall": 1.0,
+      "rechazo_no_cervical_especificidad": 1.0,
+      "precision": 1.0,
+      "f1_score": 1.0,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "matriz_confusion": {
+        "tn": 630,
+        "fp": 0,
+        "fn": 0,
+        "tp": 614
+      },
+      "stress_test_sinteticas_rechazo": "48/60 (80.0%)",
+      "validacion_leave_one_organ_out": {
+        "ALL": {
+          "imagenes_evaluadas": 600,
+          "rechazadas_como_ood": 600,
+          "tasa_rechazo_ood": 1.0
+        },
+        "Brain Cancer": {
+          "imagenes_evaluadas": 450,
+          "rechazadas_como_ood": 434,
+          "tasa_rechazo_ood": 0.9644
+        },
+        "Breast Cancer": {
+          "imagenes_evaluadas": 300,
+          "rechazadas_como_ood": 300,
+          "tasa_rechazo_ood": 1.0
+        },
+        "Kidney Cancer": {
+          "imagenes_evaluadas": 300,
+          "rechazadas_como_ood": 300,
+          "tasa_rechazo_ood": 1.0
+        },
+        "Lung and Colon Cancer": {
+          "imagenes_evaluadas": 750,
+          "rechazadas_como_ood": 729,
+          "tasa_rechazo_ood": 0.972
+        },
+        "Lymphoma": {
+          "imagenes_evaluadas": 450,
+          "rechazadas_como_ood": 450,
+          "tasa_rechazo_ood": 1.0
+        },
+        "Oral Cancer": {
+          "imagenes_evaluadas": 300,
+          "rechazadas_como_ood": 300,
+          "tasa_rechazo_ood": 1.0
+        }
+      },
+      "sobrecosto_latencia_ms": 0.178
+    },
+    "artefactos_generados": {
+      "modelo_ood": "models/ood_domain_gate_v01.joblib",
+      "matriz_confusion_looo_png": "outputs/ood_confusion_matrix.png",
+      "distribucion_scores_png": "outputs/ood_score_distribution.png"
     }
   }
 }

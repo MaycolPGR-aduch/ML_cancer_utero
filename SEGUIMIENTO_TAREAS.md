@@ -42,24 +42,25 @@
 - [x] Implementación de explicabilidad visual Grad-CAM (`prototipo_trl3/gradcam.py`) y generación de `outputs/cnn_sample_gradcam.png`.
 - [x] Consolidación de evidencia JSON unificada en `outputs/evidencia_trl3.json` y exportación de 5 muestras reales del conjunto Test en `data/sample_images/`.
 
-### Fase 4 — Aplicación Web FastAPI e Inferencia CLI
-- [x] Implementación de script CLI verificable `prototipo_trl3/infer.py` (imagen y/o registro tabular).
-- [x] Desarrollo de API REST en `prototipo_trl3/app/main.py` (`/api/health`, `/api/samples`, `/api/predict/image`, `/api/predict/sample/{filename}`, `/api/tabular/schema`, `/api/predict/tabular`, `/api/evidence`).
-- [x] Diseño e implementación de interfaz web (`index.html`, `styles.css`, `app.js`) con 3 pestañas, aviso clínico TRL 3, visualización de Grad-CAM y salida JSON descargable.
-- [x] Pruebas automatizadas end-to-end de todos los endpoints de la API y del script CLI.
+### Fase 4 — Aplicación Web FastAPI, Filtro OOD e Inferencia CLI
+- [x] Implementación de **Filtro de Validez de Dominio OOD** (`prototipo_trl3/train_eval_ood.py`, `models/ood_domain_gate_v01.joblib`) usando los 7 órganos NO cervicales de `archivebase2` (excluyendo `Cervical Cancer` de `archivebase2` para evitar data leakage) sobre embeddings compartidos de MobileNetV2: Recall 100%, Especificidad 100%, Leave-One-Organ-Out 96.4%–100%, sobrecosto `+0.178 ms`.
+- [x] Implementación de script CLI verificable `prototipo_trl3/infer.py` (imagen + OOD y/o registro tabular).
+- [x] Desarrollo de API REST en `prototipo_trl3/app/main.py` (`/api/health`, `/api/samples`, `/api/predict/image`, `/api/predict/sample/{filename}`, `/api/predict/ood-sample/{filename}`, `/api/tabular/schema`, `/api/predict/tabular`, `/api/evidence`).
+- [x] Diseño e implementación de interfaz web (`index.html`, `styles.css`, `app.js`) con 3 pestañas, aviso clínico TRL 3, rechazo visual OOD con 3 muestras de prueba, visualización de Grad-CAM y salida JSON descargable.
+- [x] Pruebas automatizadas end-to-end de todos los endpoints de la API (incluyendo rechazo OOD) y del script CLI.
 - [x] Creación de lanzador rápido en Windows (`prototipo_trl3/start_web.bat`).
 
-### Fase 5 — Repositorio y Documentación
-- [x] Creación de `.gitignore` excluyendo datasets pesados (`archive_base1/`, `*.zip`) y archivos temporales.
-- [x] Creación de `README.md` raíz, `GUIA_EJECUCION.md` y `SEGUIMIENTO_TAREAS.md`.
+### Fase 5 — Repositorio, Informe Word y Documentación
+- [x] Creación de `.gitignore` excluyendo datasets pesados (`archive_base1/`, `archivebase2/`, `*.zip`) y archivos temporales.
+- [x] Creación de `README.md` raíz, `GUIA_EJECUCION.md`, `SEGUIMIENTO_TAREAS.md` e informe técnico en Word `Informe_Tecnico_TRL3_IA_Tamizaje_Cervical.docx` (con generador reproducible `generate_trl3_report.py`).
 - [x] Inicialización de repositorio Git local y vinculación con `origin` (`https://github.com/MaycolPGR-aduch/ML_cancer_utero.git`).
 
 ---
 
 ## Próximos Pasos / Backlog (Post-TRL 3 → TRL 4 y TRL 5)
 
-- [ ] **Evidencias documentales finales TRL 3:** Tomar capturas de pantalla de la interfaz web en ejecución (las 3 pestañas) y adjuntarlas junto con las gráficas de `outputs/` al documento Word del informe.
-- [ ] **Detección fuera de dominio (OOD):** Agregar filtro previo para rechazar imágenes que no correspondan a citología cervical antes de clasificar.
+- [ ] **Evidencias documentales finales TRL 3:** Tomar capturas de pantalla de la interfaz web en ejecución (las 3 pestañas, incluyendo rechazo OOD) y adjuntarlas si se requiere complemento visual adicional.
+- [x] **Detección fuera de dominio (OOD):** Filtro previo implementado y verificado (`v0.1-trl3-ood`, rechazo 100% en test retenido y 96.4%–100% en órganos nunca vistos).
 - [ ] **Soporte de láminas completas (WSI / campo completo):** Integrar un detector/segmentador previo de células (usando las anotaciones `*_cyt.dat`/`*_nuc.dat` de las láminas completas de SIPaKMeD) para procesar campos microscópicos sin recorte manual.
 - [ ] **Exportación y despliegue en contenedor:** Empaquetar la aplicación FastAPI en `Dockerfile` y exportar la CNN a `ONNX Runtime` para despliegue reproducible en entorno integrado (TRL 4).
 - [ ] **Validación externa multicéntrica:** Evaluar generalización del modelo en un dataset independiente (ej. Herlev o cohorte hospitalaria local anonimizada con comité de ética) como paso hacia validación relevante (TRL 5).

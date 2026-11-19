@@ -237,6 +237,18 @@ main.container {
 }
 .sample-btn:hover { border-color: var(--primary); color: var(--primary); background: #f0f9ff; }
 
+.sample-btn-ood {
+  background: #faf5ff;
+  border: 1px solid #d8b4fe;
+  color: #6b21a8;
+  padding: 7px 11px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sample-btn-ood:hover { border-color: #9333ea; background: #f3e8ff; }
+
 .placeholder {
   text-align: center;
   padding: 46px 20px;
@@ -263,6 +275,7 @@ main.container {
 .triage-banner.level-ALTO { background: var(--danger-bg); border-left-color: var(--danger); }
 .triage-banner.level-MODERADO { background: var(--warning-bg); border-left-color: var(--warning); }
 .triage-banner.level-BAJO { background: var(--success-bg); border-left-color: var(--success); }
+.triage-banner.level-FUERA_DE_DOMINIO { background: #faf5ff; border-left-color: #7e22ce; }
 
 .triage-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; color: var(--muted); }
 .triage-title { font-size: 1.15rem; font-weight: 800; margin: 2px 0; }

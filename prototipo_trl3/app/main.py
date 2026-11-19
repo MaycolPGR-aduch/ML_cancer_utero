@@ -1,9 +1,15 @@
 """
 Prototipo IA-Tamizaje Cervical v0.1 (TRL 3) - Backend FastAPI + Interfaz Web
 ============================================================================
+Incluye:
+- Clasificador citologico CNN MobileNetV2 (SIPaKMeD, 5 clases) + Grad-CAM
+- Filtro previo de validez de dominio OOD (rechaza imagenes no cervicales)
+- Modulo tabular de estratificacion de riesgo (RandomForest balanceado)
+- Panel de evidencia experimental TRL 3
+
 Ejecucion local:
     cd C:\ML_img_can\prototipo_trl3
-    uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+    python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 """
 
 import base64
@@ -37,15 +43,17 @@ from gradcam import MobileNetV2GradCAM  # noqa: E402
 MODELS_DIR = BASE_DIR / "models"
 OUTPUTS_DIR = BASE_DIR / "outputs"
 SAMPLE_IMAGES_DIR = BASE_DIR / "data" / "sample_images"
+SAMPLE_OOD_DIR = BASE_DIR / "data" / "sample_ood_images"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 CNN_MODEL_PATH = MODELS_DIR / "cnn_sipakmed_trl3_v01.pt"
+OOD_MODEL_PATH = MODELS_DIR / "ood_domain_gate_v01.joblib"
 TABULAR_MODEL_PATH = MODELS_DIR / "tabular_trl3_v01.joblib"
 
 app = FastAPI(
     title="Prototipo IA-Tamizaje Cervical v0.1 (TRL 3)",
-    description="API de inferencia para clasificacion citologica (CNN MobileNetV2) y estratificacion de riesgo tabular.",
-    version="0.1.0-trl3",
+    description="API de inferencia para clasificacion citologica (CNN MobileNetV2 + Filtro OOD) y estratificacion de riesgo tabular.",
+    version="0.1.1-trl3",
 )
 
 app.add_middleware(
@@ -60,6 +68,7 @@ class AppState:
     cnn_model: Optional[nn.Module] = None
     cnn_ckpt: Optional[dict] = None
     cnn_tf = None
+    ood_bundle: Optional[dict] = None
     tabular_bundle: Optional[dict] = None
 
 
@@ -84,6 +93,8 @@ def load_models() -> None:
             transforms.ToTensor(),
             transforms.Normalize(mean=ckpt["mean"], std=ckpt["std"]),
         ])
+    if OOD_MODEL_PATH.exists():
+        state.ood_bundle = joblib.load(OOD_MODEL_PATH)
     if TABULAR_MODEL_PATH.exists():
         state.tabular_bundle = joblib.load(TABULAR_MODEL_PATH)
 
@@ -99,6 +110,35 @@ def pil_to_base64_png(img: Image.Image) -> str:
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
 
 
+def evaluate_ood_gate(emb_np: np.ndarray) -> dict:
+    if state.ood_bundle is None:
+        return {"habilitado": False, "es_citologia_cervical": True, "latencia_ood_ms": 0.0}
+
+    b = state.ood_bundle
+    t0 = time.perf_counter()
+    prob_cerv = float(b["pipeline"].predict_proba(emb_np)[0, 1])
+    norm_emb = emb_np / (np.linalg.norm(emb_np, axis=1, keepdims=True) + 1e-8)
+    max_cos = float((norm_emb @ b["class_centroids"].T).max())
+    ood_ms = (time.perf_counter() - t0) * 1000.0
+
+    is_valid = bool(prob_cerv >= float(b["prob_threshold"]) and max_cos >= float(b["cosine_threshold"]))
+    return {
+        "habilitado": True,
+        "version_ood": b["version"],
+        "es_citologia_cervical": is_valid,
+        "probabilidad_dominio_cervical": round(prob_cerv, 4),
+        "umbral_probabilidad": float(b["prob_threshold"]),
+        "similitud_coseno_centroides": round(max_cos, 4),
+        "umbral_coseno": float(b["cosine_threshold"]),
+        "latencia_ood_ms": round(ood_ms, 3),
+        "motivo": (
+            "Imagen validada dentro del dominio de citologia cervical."
+            if is_valid
+            else "Imagen rechazada por el filtro de validez (OOD): sus caracteristicas visuales no corresponden a citologia cervical (SIPaKMeD)."
+        ),
+    }
+
+
 def run_cnn_inference(pil_img: Image.Image, filename: str) -> dict:
     if state.cnn_model is None or state.cnn_ckpt is None:
         raise HTTPException(
@@ -112,11 +152,52 @@ def run_cnn_inference(pil_img: Image.Image, filename: str) -> dict:
 
     t0 = time.perf_counter()
     with torch.no_grad():
-        logits = state.cnn_model(inp)
+        feats = state.cnn_model.features(inp)
+        pooled = feats.mean(dim=[2, 3])
+        logits = state.cnn_model.classifier(pooled)
         probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
+        emb_np = pooled.cpu().numpy()
     inference_ms = (time.perf_counter() - t0) * 1000.0
 
     ckpt = state.cnn_ckpt
+    preview_224 = rgb_img.resize((ckpt["img_size"], ckpt["img_size"]), Image.BILINEAR)
+    ood_info = evaluate_ood_gate(emb_np)
+
+    # Si el filtro OOD rechaza la imagen, NO emitir clasificacion clinica engaosa
+    if not ood_info["es_citologia_cervical"]:
+        return {
+            "modulo": "cnn_citologia_sipakmed",
+            "version": ckpt["version"],
+            "dominio_valido": False,
+            "validacion_dominio_ood": ood_info,
+            "entrada": {
+                "archivo": filename,
+                "tamano_original": [orig_w, orig_h],
+                "tamano_modelo": [ckpt["img_size"], ckpt["img_size"]],
+            },
+            "prediccion": {
+                "clase_predicha": "FUERA_DE_DOMINIO",
+                "nombre_clinico": "Imagen Fuera de Dominio (Rechazada)",
+                "categoria_tamizaje": "No Valida",
+                "descripcion": ood_info["motivo"],
+                "confianza": 0.0,
+                "probabilidad_anormal_agregada": 0.0,
+                "nivel_tamizaje": "FUERA_DE_DOMINIO",
+                "recomendacion_apoyo": "Por seguridad del tamizaje, el sistema detuvo la clasificacion. Por favor cargue una microfotografia celular de citologia cervical valida.",
+                "probabilidades": [],
+            },
+            "tiempos_ms": {
+                "inferencia_cnn": round(inference_ms, 2),
+                "filtro_ood": ood_info["latencia_ood_ms"],
+                "gradcam_xai": 0.0,
+            },
+            "imagenes": {
+                "entrada_224": pil_to_base64_png(preview_224),
+                "gradcam_overlay": None,
+            },
+            "aviso_legal": "Filtro de seguridad OOD activo (TRL 3/4): evita predicciones forzadas sobre imagenes que no corresponden a citologia cervical.",
+        }
+
     classes = ckpt["classes"]
     pred_idx = int(np.argmax(probs))
     pred_class = classes[pred_idx]
@@ -128,8 +209,6 @@ def run_cnn_inference(pil_img: Image.Image, filename: str) -> dict:
     gcam = MobileNetV2GradCAM(state.cnn_model)
     overlay_np, _ = gcam.generate(inp, rgb_img, target_class=pred_idx, alpha=0.45)
     gradcam_ms = (time.perf_counter() - t_cam0) * 1000.0
-
-    preview_224 = rgb_img.resize((ckpt["img_size"], ckpt["img_size"]), Image.BILINEAR)
 
     if prob_abnormal >= 0.50:
         triage_level = "ALTO"
@@ -158,6 +237,8 @@ def run_cnn_inference(pil_img: Image.Image, filename: str) -> dict:
     return {
         "modulo": "cnn_citologia_sipakmed",
         "version": ckpt["version"],
+        "dominio_valido": True,
+        "validacion_dominio_ood": ood_info,
         "entrada": {
             "archivo": filename,
             "tamano_original": [orig_w, orig_h],
@@ -176,6 +257,7 @@ def run_cnn_inference(pil_img: Image.Image, filename: str) -> dict:
         },
         "tiempos_ms": {
             "inferencia_cnn": round(inference_ms, 2),
+            "filtro_ood": ood_info["latencia_ood_ms"],
             "gradcam_xai": round(gradcam_ms, 2),
         },
         "imagenes": {
@@ -190,21 +272,30 @@ def run_cnn_inference(pil_img: Image.Image, filename: str) -> dict:
 def health():
     return {
         "status": "ok",
-        "version": "v0.1-trl3",
+        "version": "v0.1.1-trl3",
         "cnn_ready": state.cnn_model is not None,
+        "ood_ready": state.ood_bundle is not None,
         "tabular_ready": state.tabular_bundle is not None,
     }
 
 
 @app.get("/api/samples")
 def list_samples():
-    if not SAMPLE_IMAGES_DIR.exists():
-        return {"samples": []}
     samples = []
-    for p in sorted(SAMPLE_IMAGES_DIR.glob("*.bmp")):
-        cls = p.name.split("_0")[0]
-        samples.append({"filename": p.name, "expected_class": cls})
-    return {"samples": samples}
+    if SAMPLE_IMAGES_DIR.exists():
+        for p in sorted(SAMPLE_IMAGES_DIR.glob("*.bmp")):
+            cls = p.name.split("_0")[0]
+            samples.append({"filename": p.name, "expected_class": cls})
+
+    ood_samples = []
+    if SAMPLE_OOD_DIR.exists():
+        for p in sorted(SAMPLE_OOD_DIR.glob("*.jpg")):
+            # ej. ood_brain_glioma_brain_glioma_1965.jpg -> Brain Glioma
+            parts = p.stem.replace("ood_", "").split("_")
+            label = " ".join(parts[:2]).title() if len(parts) >= 2 else p.stem
+            ood_samples.append({"filename": p.name, "label": label})
+
+    return {"samples": samples, "ood_samples": ood_samples}
 
 
 @app.post("/api/predict/image")
@@ -226,6 +317,16 @@ def predict_sample_image(filename: str):
     target = SAMPLE_IMAGES_DIR / safe_name
     if not target.exists():
         raise HTTPException(status_code=404, detail="Imagen de muestra no encontrada.")
+    pil_img = Image.open(target)
+    return JSONResponse(run_cnn_inference(pil_img, safe_name))
+
+
+@app.post("/api/predict/ood-sample/{filename}")
+def predict_ood_sample_image(filename: str):
+    safe_name = Path(filename).name
+    target = SAMPLE_OOD_DIR / safe_name
+    if not target.exists():
+        raise HTTPException(status_code=404, detail="Imagen OOD de prueba no encontrada.")
     pil_img = Image.open(target)
     return JSONResponse(run_cnn_inference(pil_img, safe_name))
 
@@ -315,10 +416,13 @@ def get_evidence():
     result = {}
     tab_path = OUTPUTS_DIR / "evidencia_tabular_trl3.json"
     cnn_path = OUTPUTS_DIR / "evidencia_cnn_trl3.json"
+    ood_path = OUTPUTS_DIR / "evidencia_ood_trl3.json"
     if tab_path.exists():
         result["modulo_tabular"] = json.loads(tab_path.read_text(encoding="utf-8"))
     if cnn_path.exists():
         result["modulo_cnn"] = json.loads(cnn_path.read_text(encoding="utf-8"))
+    if ood_path.exists():
+        result["modulo_ood"] = json.loads(ood_path.read_text(encoding="utf-8"))
     return result
 
 

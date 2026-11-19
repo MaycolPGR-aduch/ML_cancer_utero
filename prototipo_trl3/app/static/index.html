@@ -58,6 +58,13 @@
             </div>
           </div>
 
+          <div class="samples-box">
+            <h3>Probar Filtro de Seguridad OOD (imágenes NO cervicales):</h3>
+            <div id="oodSampleButtons" class="sample-buttons">
+              <span class="muted">Cargando muestras OOD...</span>
+            </div>
+          </div>
+
           <div id="cnnError" class="alert alert-error hidden"></div>
         </div>
 
@@ -82,19 +89,21 @@
 
             <div class="meta-row" id="cnnMetaRow"></div>
 
-            <div class="visual-compare">
+            <div class="visual-compare" id="cnnVisualCompare">
               <div class="img-box">
                 <div class="img-caption">Entrada Preprocesada (224×224)</div>
                 <img id="cnnPreviewImg" alt="Entrada 224x224" />
               </div>
-              <div class="img-box">
+              <div class="img-box" id="cnnGradcamBox">
                 <div class="img-caption">Explicabilidad Grad-CAM (Zonas de Atención)</div>
                 <img id="cnnGradcamImg" alt="Grad-CAM Overlay" />
               </div>
             </div>
 
-            <h3 class="section-sub">Distribución de Probabilidades (5 Clases SIPaKMeD)</h3>
-            <div id="cnnProbBars" class="prob-bars"></div>
+            <div id="cnnProbSection">
+              <h3 class="section-sub">Distribución de Probabilidades (5 Clases SIPaKMeD)</h3>
+              <div id="cnnProbBars" class="prob-bars"></div>
+            </div>
 
             <details class="json-details">
               <summary>Ver salida JSON estructurada (Evidencia de inferencia TRL 3)</summary>
@@ -197,6 +206,11 @@
           <h3>Módulo Tabular (Factores de Riesgo — 858 registros)</h3>
           <div id="tabEvidenceSummary" class="evidence-list"></div>
         </div>
+      </div>
+
+      <div class="card" style="margin-top: 18px;">
+        <h3>Módulo Filtro de Validez de Dominio OOD (archivebase2 — 7 Órganos No Cervicales)</h3>
+        <div id="oodEvidenceSummary" class="evidence-list"></div>
       </div>
 
       <div class="card" style="margin-top: 18px;">

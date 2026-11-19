@@ -3,6 +3,8 @@
 # ==============================================================================
 archive_base1/
 archive_base1.zip
+archivebase2/
+archive_base2/
 drive-download-*.zip
 *.zip
 *.tar
